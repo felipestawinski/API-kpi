@@ -1,0 +1,91 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time" 
+	"go.mongodb.org/mongo-driver/bson"
+	"github.com/BloxBerg-UTFPR/API-Blockchain/models"
+	"github.com/BloxBerg-UTFPR/API-Blockchain/pkg/config"
+	"github.com/BloxBerg-UTFPR/API-Blockchain/pkg/database"
+	"golang.org/x/crypto/bcrypt"
+	"regexp"
+)
+
+//TODO* Armazenar a key em um lugar seguro
+var jwtKey = []byte("my_secret_key")
+// Função chamada para a rota /register
+func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+
+	db := database.NewMongoDB(config.MongoURI)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var user models.User
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("user", user)
+
+	// Validate password
+	if err := validatePassword(user.Password); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	collection := db.Database(database.DbName).Collection(database.CollectionName)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Verificação - usuário já existe
+	var existingUser models.User
+	err := collection.FindOne(ctx, bson.M{"username": user.Username}).Decode(&existingUser)
+	if err == nil {
+		http.Error(w, "Username already exists", http.StatusConflict)
+		return
+	}
+
+	// Criptografia da senha
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "Error hashing password", http.StatusInternalServerError)
+		return
+	}
+	user.Password = string(hashedPassword)
+
+	// Insere novo usuário
+	_, err = collection.InsertOne(ctx, user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintln(w, "User registered successfully")
+}
+
+// validatePassword checks if the password meets the required criteria
+func validatePassword(password string) error {
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters long")
+	}
+	if !regexp.MustCompile(`[A-Z]`).MatchString(password) {
+		return fmt.Errorf("password must contain at least one uppercase letter")
+	}
+	if !regexp.MustCompile(`[a-z]`).MatchString(password) {
+		return fmt.Errorf("password must contain at least one lowercase letter")
+	}
+	if !regexp.MustCompile(`[0-9]`).MatchString(password) {
+		return fmt.Errorf("password must contain at least one digit")
+	}
+	if !regexp.MustCompile(`[!@#\$%\^&\*]`).MatchString(password) {
+		return fmt.Errorf("password must contain at least one special character")
+	}
+	return nil
+}
