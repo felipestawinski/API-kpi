@@ -49,3 +49,7 @@ Arquitetura
     3 - Padrão de código (BDD, DDD, MVC , etc)
     4 - Testes
     5 - CI/CD (Github Actions yaml) (https://www.redhat.com/pt-br/topics/devops/what-is-ci-cd)
+
+Como rodar o projeto
+
+abigen --abi=./cmd/api/contract/contract.abi --bin=./cmd/api/contract/contract.bin --pkg=contract --out=contract.go

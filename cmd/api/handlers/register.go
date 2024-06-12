@@ -12,10 +12,11 @@ import (
 	"github.com/BloxBerg-UTFPR/API-Blockchain/pkg/database"
 	"golang.org/x/crypto/bcrypt"
 	"regexp"
+	"os"
 )
 
 //TODO* Armazenar a key em um lugar seguro
-var jwtKey = []byte("my_secret_key")
+var jwtKey = []byte(os.Getenv("JWT_KEY"))
 // Função chamada para a rota /register
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -58,6 +59,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user.Password = string(hashedPassword)
+
+	// Default permission level
+	user.Permission = 3
 
 	// Insere novo usuário
 	_, err = collection.InsertOne(ctx, user)
