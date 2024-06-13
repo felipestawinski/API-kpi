@@ -50,6 +50,17 @@ Arquitetura
     4 - Testes
     5 - CI/CD (Github Actions yaml) (https://www.redhat.com/pt-br/topics/devops/what-is-ci-cd)
 
-Como rodar o projeto
+
+
+------- How to run --------
+
+1 - ro gun cmd/api/main/main.go
+
+2 - Send a request to http://localhost:8080/register to register
+
+Attach in the Body of the request
+{"username":"your_username", "password":"your_password", "email": "your_email"}
+
+3 - Send a request to http://localhost:8080/login to login
 
 abigen --abi=./cmd/api/contract/contract.abi --bin=./cmd/api/contract/contract.bin --pkg=contract --out=contract.go
