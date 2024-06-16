@@ -10,20 +10,13 @@ import (
 	"os"
 )
 
-// const (
-// 	//apiKey    = "ce2aeebcad4e9569c329"
-// 	apiKey2 = os.Getenv("API_KEY")
-// 	apiSecret = "0882542cca250d1ca353ec671086f787607610046e1d38faa821f100f6e2f528"
-// 	secret_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiI4NmRiYjgwZi0xYmE3LTQyMDgtOTYyYi0yYzVkMWJiNjVmZDciLCJlbWFpbCI6ImZlbGlwZS5zdGF3aW5za2lAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsInBpbl9wb2xpY3kiOnsicmVnaW9ucyI6W3siaWQiOiJGUkExIiwiZGVzaXJlZFJlcGxpY2F0aW9uQ291bnQiOjF9LHsiaWQiOiJOWUMxIiwiZGVzaXJlZFJlcGxpY2F0aW9uQ291bnQiOjF9XSwidmVyc2lvbiI6MX0sIm1mYV9lbmFibGVkIjpmYWxzZSwic3RhdHVzIjoiQUNUSVZFIn0sImF1dGhlbnRpY2F0aW9uVHlwZSI6InNjb3BlZEtleSIsInNjb3BlZEtleUtleSI6ImNlMmFlZWJjYWQ0ZTk1NjljMzI5Iiwic2NvcGVkS2V5U2VjcmV0IjoiMDg4MjU0MmNjYTI1MGQxY2EzNTNlYzY3MTA4NmY3ODc2MDc2MTAwNDZlMWQzOGZhYTgyMWYxMDBmNmUyZjUyOCIsImlhdCI6MTcxNzUxMDU5N30.o7xEZ4z3lGPi9EZceBt5B0ACYC3p5P9VHxH3x33l0dU"
-// )
-
-
-
 // uploadFileToPinata uploads a file to Pinata and returns the IPFS hash
 func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 
+	
 	apiKey := os.Getenv("API_KEY")
 	apiSecret := os.Getenv("API_SECRET")
+
 
 	// Prepare the form data
 	var body bytes.Buffer
@@ -46,7 +39,11 @@ func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 		return "", fmt.Errorf("failed to create request: %v", err)
 	}
 
+	fmt.Println("apiKey->", apiKey)
+	fmt.Println("apiSecret->", apiSecret)
 	// Add headers
+
+	
 	req.Header.Set("pinata_api_key", apiKey)
 	req.Header.Set("pinata_secret_api_key", apiSecret)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -84,6 +81,8 @@ func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 
 // uploadFileHandler handles the HTTP request for file upload
 func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
+	UserAuthorized(w, r)
+	
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return

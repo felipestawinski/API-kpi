@@ -54,13 +54,26 @@ Arquitetura
 
 ------- How to run --------
 
-1 - ro gun cmd/api/main/main.go
+1 - Create a .env at root :
+API_KEY = "yourApiKey"
+API_SECRET "yourApiSecret"
+JWT_TOKEN "yourJwtToken"
 
-2 - Send a request to http://localhost:8080/register to register
+2 - ro gun cmd/api/main/main.go
+
+3 - Send a request to http://localhost:8080/register to register
 
 Attach in the Body of the request
 {"username":"your_username", "password":"your_password", "email": "your_email"}
 
-3 - Send a request to http://localhost:8080/login to login
+4 - Send a request to http://localhost:8080/login to login, only with username and password at the body:
+{"username":"your_username", "password":"your_password"}
 
-abigen --abi=./cmd/api/contract/contract.abi --bin=./cmd/api/contract/contract.bin --pkg=contract --out=contract.go
+5 - To upload a file to ipfs http://localhost:8080/upload and add a file in the body of the request
+
+6 - To interact with a contract, Add a "Action" header on the request. Also,
+the JWT token shoulb be passed as "Authorization" header 
+
+*Remember to put your contract and account address on BlockchainInteracion function
+Command to generate Go Bindings
+abigen --abi=./cmd/api/contract/contract.abi --bin=./cmd/api/contract/contract.bin --pkg=contract --out=./cmd/api/contract/contract.go

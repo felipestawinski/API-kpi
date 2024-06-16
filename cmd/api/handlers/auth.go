@@ -15,12 +15,11 @@ import (
 
 
 // welcomeHandler handles welcome requests for logged-in users
-func WelcomeHandler(w http.ResponseWriter, r *http.Request) {
+func UserAuthorized(w http.ResponseWriter, r *http.Request) {
 
 	//Check for the Authorization header
 	tokenStr := r.Header.Get("Authorization")
 	if tokenStr == "" {
-		fmt.Print("AQUI")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -55,6 +54,5 @@ func WelcomeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Welcome, %s!", claims.Subject)
+	return
 }
