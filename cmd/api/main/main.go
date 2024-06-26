@@ -17,7 +17,7 @@ func main() {
 	http.HandleFunc("/register", handlers.RegisterHandler)
 	http.HandleFunc("/login", handlers.LoginHandler)
 	http.HandleFunc("/upload", handlers.UploadFileHandler)
-	http.HandleFunc("/blockchain", handlers.BlockchainInteraction)
+	http.HandleFunc("/blockchain/{method}", handlers.BlockchainInteraction)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 

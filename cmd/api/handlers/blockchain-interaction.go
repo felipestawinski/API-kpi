@@ -22,58 +22,66 @@ func BlockchainInteraction(w http.ResponseWriter, r *http.Request) {
 	contractAddress := "0x5BcC1E2133119cb819c97418B73C770727001FBd"
 	UserAuthorized(w, r)
 
-	action := r.Header.Get("Action")
+	action := r.PathValue("method")
+	fmt.Println("method: ", action)
+	//action := r.Header.Get("Action")
 
 	ethclient := ConnectToEthereum()
 	conn, err := contract.NewContract(common.HexToAddress(contractAddress), ethclient)
 		if err != nil {
 			panic(err)
 		}
+
 	
-	res := ""
-
-	fmt.Println("ACTION: ", action)
-
 	if action == "" {
 		http.Error(w, "Action should be provided", http.StatusUnauthorized)
 		return
-	}
-
-	if action == "name" {
+	} else if action == "name" {
 		res, err := conn.Name(&bind.CallOpts{})
 		if err != nil {
 			panic (err)
 		}
-		fmt.Println("Name", res)
-	}
-
-	if action == "nonces" {
+		fmt.Fprintf(w, res)
+		w.WriteHeader(http.StatusOK)
+		fmt.Println(res)
+	} else if action == "nonces" {
 		res, err := conn.Nonces(&bind.CallOpts{}, common.HexToAddress((accountAddress)))
 		if err != nil {
 			panic (err)
 		}
 		fmt.Println("Nonces", res)
-	}
-
-	if action == "owner" {
+		w.WriteHeader(http.StatusOK)
+	} else if action == "owner" {
 		res, err := conn.Owner(&bind.CallOpts{})
 		if err != nil {
 			panic (err)
 		}
 		fmt.Println("Owner: ", res)
-	}
-
-	if action == "paused" {
+		w.WriteHeader(http.StatusOK)
+		fmt.Println(res)
+	} else if action == "paused" {
 		res, err := conn.Paused(&bind.CallOpts{})
 		if err != nil {
 			panic (err)
 		}
 		fmt.Println("Paused: ", res)
+		w.WriteHeader(http.StatusOK)
+		fmt.Println(res)
+	} else if action == "pause" {
+		//still not working
+		res, err := conn.Pause(&bind.TransactOpts{})
+		if err != nil {
+			panic (err)
+		}
+		fmt.Println("Pause: ", res)
+		w.WriteHeader(http.StatusOK)
+		fmt.Println(res)
+	} else {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, "Unknown method:" + action)
+		return
 	}
 
-	
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Response: " + res)
 }
 
 func ConnectToEthereum() *ethclient.Client {

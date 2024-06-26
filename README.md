@@ -54,12 +54,15 @@ Arquitetura
 
 ------- How to run --------
 
-1 - Create a .env at root :
-API_KEY = "yourApiKey"
-API_SECRET "yourApiSecret"
+Install MongoDB -> https://www.mongodb.com/docs/manual/administration/install-community/
+Install GO -> https://go.dev/doc/install
+
+1 - Create a .env at root to store Pinata keys and jwt token:
+API_KEY = "yourPinataApiKey"
+API_SECRET "yourPinataApiSecret"
 JWT_TOKEN "yourJwtToken"
 
-2 - ro gun cmd/api/main/main.go
+2 - go gun cmd/api/main/main.go
 
 3 - Send a request to http://localhost:8080/register to register
 
@@ -68,11 +71,12 @@ Attach in the Body of the request
 
 4 - Send a request to http://localhost:8080/login to login, only with username and password at the body:
 {"username":"your_username", "password":"your_password"}
+You must receive a jwt token as response. This token must be used later to interact with the blockchain.
 
 5 - To upload a file to ipfs http://localhost:8080/upload and add a file in the body of the request
 
-6 - To interact with a contract, Add a "Action" header on the request. Also,
-the JWT token shoulb be passed as "Authorization" header 
+6 - To interact with a contract: http://localhost:8080/blockchain/<method_name>
+Obs: Attach your jwt token on a header "Authorization"
 
 *Remember to put your contract and account address on BlockchainInteracion function
 Command to generate Go Bindings

@@ -13,6 +13,7 @@ import (
     "github.com/BloxBerg-UTFPR/API-Blockchain/cmd/api/contract"
 )
 
+// This file is deprecated, desconsider it
 func Blockchain( deploy string ) {
 	client := ConnectToEthereum()
 	
