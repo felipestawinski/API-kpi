@@ -80,6 +80,7 @@ func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 }
 
 // uploadFileHandler handles the HTTP request for file upload
+// uploadFileHandler handles the HTTP request for file upload
 func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	UserAuthorized(w, r)
 	
@@ -104,10 +105,24 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	fmt.Printf("Uploaded File: %+v\n", handler.Filename)
-	fmt.Printf("File Size: %+v\n", handler.Size)
-	fmt.Printf("MIME Header: %+v\n", handler.Header)
+	// Create JSON file with file details
+	fileDetails := map[string]interface{}{
+		"name": handler.Filename,
+		"size": handler.Size,
+	}
+	fileDetailsBytes, err := json.Marshal(fileDetails)
+	if err != nil {
+		http.Error(w, "Error creating file details JSON", http.StatusInternalServerError)
+		return
+	}
+	jsonFilePath := "json-files/" + handler.Filename + ".json"
+	err = os.WriteFile(jsonFilePath, fileDetailsBytes, 0644)
+	if err != nil {
+		http.Error(w, "Error saving file details JSON", http.StatusInternalServerError)
+		return
+	}
 
+	// Upload the original file to IPFS
 	ipfsHash, err := uploadFileToPinata(file, handler.Filename)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error uploading file: %v", err), http.StatusInternalServerError)
@@ -115,6 +130,23 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Upload the JSON file to IPFS
+	jsonFile, err := os.Open(jsonFilePath)
+	if err != nil {
+		http.Error(w, "Error opening JSON file", http.StatusInternalServerError)
+		return
+	}
+	defer jsonFile.Close()
+	jsonIpfsHash, err := uploadFileToPinata(jsonFile, handler.Filename+".json")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error uploading JSON file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with both IPFS hashes
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"ipfsHash": ipfsHash})
+	json.NewEncoder(w).Encode(map[string]string{
+		"fileIpfsHash": ipfsHash,
+		"jsonIpfsHash": jsonIpfsHash,
+	})
 }
