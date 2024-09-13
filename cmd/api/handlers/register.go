@@ -13,6 +13,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"regexp"
 	"os"
+	"github.com/sendgrid/sendgrid-go"
+	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
 //TODO* Armazenar a key em um lugar seguro
@@ -52,6 +54,14 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verificação - email ja cadastrado
+	var userEmail models.User
+	err = collection.FindOne(ctx, bson.M{"email": user.Email}).Decode(&userEmail)
+	if err == nil {
+		http.Error(w, "Email already exists", http.StatusConflict)
+		return
+	}
+
 	// Criptografia da senha
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -69,6 +79,13 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// After successful user registration
+	if err := sendWelcomeEmail(user.Email); err != nil {
+		// Log the error, but don't return it to the user
+		fmt.Printf("Error sending welcome email: %v\n", err)
+	}
+
 
 	w.WriteHeader(http.StatusCreated)
 	fmt.Fprintln(w, "User registered successfully")
@@ -92,4 +109,17 @@ func validatePassword(password string) error {
 		return fmt.Errorf("password must contain at least one special character")
 	}
 	return nil
+}
+
+func sendWelcomeEmail(email string) error {
+	fmt.Printf("Sending email to %s", email)
+	from := mail.NewEmail("Blockchain", "felipe.stawinski@gmail.com")
+	subject := "Welcome"
+	to := mail.NewEmail("New User", email)
+	plainTextContent := "Welcome! We're glad to have you on board."
+	htmlContent := "<strong>Welcome to Your App!</strong><p>We're glad to have you on board.</p>"
+	message := mail.NewSingleEmail(from, subject, to, plainTextContent, htmlContent)
+	client := sendgrid.NewSendClient(os.Getenv("SENDGRID_API_KEY"))
+	_, err := client.Send(message)
+	return err
 }
