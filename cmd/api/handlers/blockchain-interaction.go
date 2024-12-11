@@ -19,25 +19,33 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-var readMethods = map[string]bool{
-	"DOMAIN_SEPARATOR": true,
-	"Allowance":        true,
-	"BalanceOf":        true,
-	"Decimals":         true,
-	"Eip712Domain":     true,
-	"Name":             true,
-	"Nonces":           true,
-	"Owner":            true,
-	"Paused":           true,
-	"Symbol":           true,
-	"TotalSupply":      true,
-}
+// var readMethods = map[string]bool{
+// 	"DOMAIN_SEPARATOR": true,
+// 	"Allowance":        true,
+// 	"BalanceOf":        true,
+// 	"Decimals":         true,
+// 	"Eip712Domain":     true,
+// 	"Name":             true,
+// 	"Nonces":           true,
+// 	"Owner":            true,
+// 	"Paused":           true,
+// 	"Symbol":           true,
+// 	"TotalSupply":      true,
+// }
 
-// welcomeHandler handles welcome requests for logged-in users
+var readMethods = map[string]bool{
+    "GetAccessLevel": true,
+    "GetMetaData": true,
+}
+//Create a function to interact with the blockchain
+
 func BlockchainInteraction(w http.ResponseWriter, r *http.Request) {
 	//Make sure to remove the prefix '0x' of private key 
 	//Eg.: 0xb13b0008c5cb0379f1d3a427bbfc75838a50eea795cf549c17b25e2c350c2e83 -> b13b0008c5cb0379f1d3a427bbfc75838a50eea795cf549c17b25e2c350c2e83
-	contractAddress := "0x5BcC1E2133119cb819c97418B73C770727001FBd"
+	//contractAddress := "0x5BcC1E2133119cb819c97418B73C770727001FBd"
+
+	//contrato vitao
+	contractAddress := "0x473f8eA5Ce1F35acf7Eb61A6D4b74C8f5cf2f362"
 	
 	UserAuthorized(w, r)
 
@@ -46,7 +54,7 @@ func BlockchainInteraction(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Action should be provided", http.StatusBadRequest)
 		return
 	}
-
+	
 	ethclient := ConnectToEthereum()
 	conn, err := contract.NewContract(common.HexToAddress(contractAddress), ethclient)
 	if err != nil {
@@ -68,7 +76,10 @@ func BlockchainInteraction(w http.ResponseWriter, r *http.Request) {
 		result, err = callReadMethod(conn, action, params...)
 	} else {
 		//accountAddress := "0x42A2069C3F18DCd7e3a61276A8401bE431958239"
-		privateKey := "a5058f2733cf8c615730962e75ed4af277df4983a9243298cd1c77afa621681f"
+		//privateKey := "a5058f2733cf8c615730962e75ed4af277df4983a9243298cd1c77afa621681f"
+
+		//privateKey vitao
+		privateKey := "65ec240a4866e5f3aa86aef6da44daea4eed19172b9991c6244ba87865de955f"
 		auth := getAccountAuth(ethclient, privateKey)
 		txn, err = callWriteMethod(conn, action, auth, params...)
 	}
@@ -95,9 +106,16 @@ func callReadMethod(conn *contract.Contract, methodName string, params ...interf
 
 	inputs := make([]reflect.Value, len(params)+1)
 	inputs[0] = reflect.ValueOf(&bind.CallOpts{})
-	for i, param := range params {
-		inputs[i+1] = reflect.ValueOf(param)
+	methodType := method.Type()
+	for i := 0; i < len(params); i++ {
+		paramType := methodType.In(i + 1)
+		convertedParam, err := convertParam(params[i], paramType)
+		if err != nil {
+			return nil, fmt.Errorf("error converting parameter %d: %v", i, err)
+		}
+		inputs[i+1] = reflect.ValueOf(convertedParam)
 	}
+
 
 	results := method.Call(inputs)
 	if len(results) == 0 {
@@ -162,7 +180,9 @@ func convertParam(param interface{}, targetType reflect.Type) (interface{}, erro
 
 
 func ConnectToEthereum() *ethclient.Client {
-    client, err := ethclient.Dial("https://polygon-amoy.g.alchemy.com/v2/5N0az1E28WsPnYk7g37TnNSNs3QZwKMr")
+    //client, err := ethclient.Dial("https://polygon-amoy.g.alchemy.com/v2/5N0az1E28WsPnYk7g37TnNSNs3QZwKMr")
+
+	client, err := ethclient.Dial("https://polygon-amoy.g.alchemy.com/v2/jsocrRMAC5988zy4JCKk1BY8_hWHBMHB")
     if err != nil {
         log.Fatalf("Failed to connect to the Ethereum client: %v", err)
     }
@@ -206,6 +226,6 @@ func getAccountAuth(client *ethclient.Client, accountAddress string) *bind.Trans
 	auth.Nonce = big.NewInt(int64(nonce))
 	auth.Value = big.NewInt(0)      // in wei
 	auth.GasLimit = uint64(3000000) // in units
-	auth.GasPrice = big.NewInt(1000000)
+	auth.GasPrice = big.NewInt(25000000000)
 	return auth
 }

@@ -51,7 +51,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
+	fmt.Println("Register method")
 	fmt.Println("user", user)
 
 	// Validate password
@@ -68,6 +68,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var existingUser models.User
 	err := collection.FindOne(ctx, bson.M{"username": user.Username}).Decode(&existingUser)
 	if err == nil {
+		fmt.Println("Username already exists", user)
 		http.Error(w, "Username already exists", http.StatusConflict)
 		return
 	}
@@ -76,6 +77,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var userEmail models.User
 	err = collection.FindOne(ctx, bson.M{"email": user.Email}).Decode(&userEmail)
 	if err == nil {
+		fmt.Println("Email already exists", user)
 		http.Error(w, "Email already exists", http.StatusConflict)
 		return
 	}
@@ -130,7 +132,7 @@ func validatePassword(password string) error {
 }
 
 func sendWelcomeEmail(email string) error {
-	fmt.Printf("Sending email to %s", email)
+	fmt.Println("Sending email to %s", email)
 	from := mail.NewEmail("Blockchain", "felipe.stawinski@gmail.com")
 	subject := "Welcome"
 	to := mail.NewEmail("New User", email)
