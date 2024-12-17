@@ -8,8 +8,8 @@ type User struct {
 	Email    string `json:"email" bson:"email"`
 	Password string `json:"password" bson:"password"`
 	Permission int  `json:"permission" bson:"permission"`
+	Files []string  `json:"files,omitempty" bson:"files,omitempty"`
 }
-
 // Session represents a user session
 type Session struct {
 	Username string

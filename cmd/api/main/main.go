@@ -32,6 +32,7 @@ func main() {
 	http.Handle("/register", enableCORS(http.HandlerFunc(handlers.RegisterHandler)))
 	http.HandleFunc("/login", handlers.LoginHandler)
 	http.HandleFunc("/upload", handlers.UploadFileHandler)
+	http.HandleFunc("/files", handlers.GetFilesHandler)
 	http.HandleFunc("/blockchain/{method}", handlers.BlockchainInteraction)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))

@@ -6,8 +6,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"mime/multipart"
 	"os"
+	"github.com/BloxBerg-UTFPR/API-Blockchain/pkg/config"
+	"github.com/BloxBerg-UTFPR/API-Blockchain/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"context"
+	"github.com/BloxBerg-UTFPR/API-Blockchain/models"
+	"time" 
 )
 
 // uploadFileToPinata uploads a file to Pinata and returns the IPFS hash
@@ -136,6 +143,142 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Error uploading file to Pinata: %v\n", err)
 		return
 	}
+
+	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
+	//ipfs_hash check
+	//nome do arquivo check
+	//enderco do contrato -- 
+	//nome da instituicao -- check
+	//tx hash -- still missing - chamar o PostData
+	//http://localhost:8080/blockchain/PostData?entity="UTFPR"&uri="https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/QmeKbMkU2nKoF22d18q2yLtd9qCnr2mL7W5PnDqpQ6D2sa"
+
+
+	// Format the blockchain POST URL
+	blockchainURL := fmt.Sprintf("http://localhost:8080/blockchain/PostData?entity=%s&uri=%s", 
+	url.QueryEscape("UTFPR"), 
+	url.QueryEscape(uri))
+
+	// Make the POST request
+	resp, err := http.Post(blockchainURL, "application/json", nil)
+	if err != nil {
+	http.Error(w, fmt.Sprintf("Error calling blockchain: %v", err), http.StatusInternalServerError)
+	return
+	}
+	defer resp.Body.Close()
+
+	// Read the response
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+	http.Error(w, fmt.Sprintf("Error reading response: %v", err), http.StatusInternalServerError)
+	return
+	}
+	fmt.Printf("body: %s", body)
+
+	// Create file info struct
+	type FileInfo struct {
+	ID       int    `json:"id" bson:"id"`
+	Filename string `json:"filename" bson:"filename"`
+	Institution string `json:"institution" bson:"institution"`
+	ContractAddress string `json:"contractAddress" bson:"contractAddress"`
+	TxHash   string `json:"txHash" bson:"txHash"`
+	IfpsHash string `json:"ifpsHash" bson:"ifpsHash"`
+	}
+
+	// Store the transaction hash
+	institution := "UTFPR"
+	username := "teste"
+		// Define struct for JSON response
+	type BlockchainResponse struct {
+		TxHash string `json:"txHash"`
+	}
+
+	// Parse JSON response
+	var response BlockchainResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		http.Error(w, fmt.Sprintf("Error parsing response: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Get clean hash value
+	txHash := response.TxHash
+	fmt.Printf("txHash: %s\n", txHash)
+	contractAddress := "0x473f8eA5Ce1F35acf7Eb61A6D4b74C8f5cf2f362"
+	//ifpsHash
+	//handler.Filename
+
+	db := database.NewMongoDB(config.MongoURI)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get user collection
+	collection := db.Database(database.DbName).Collection(database.CollectionName)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Find user
+	var user models.User
+	err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Determine new ID
+	newID := 1
+	if len(user.Files) > 0 {
+		// Find highest ID
+		maxID := 0
+		for _, file := range user.Files {
+			var fileInfo FileInfo
+			if err := json.Unmarshal([]byte(file), &fileInfo); err != nil {
+				continue
+			}
+			if fileInfo.ID > maxID {
+				maxID = fileInfo.ID
+			}
+		}
+		newID = maxID + 1
+	}
+
+	// Create new file entry
+	newFile := FileInfo{
+		ID:       newID,
+		Filename: handler.Filename,
+		Institution: institution,
+		ContractAddress: contractAddress,
+		TxHash:   txHash,
+		IfpsHash: ipfsHash,
+	}
+
+	fmt.Printf("Inserting new file: %+v\n", newFile)
+
+	// Convert to JSON string
+	newFileJSON, err := json.Marshal(newFile)
+	if err != nil {
+		http.Error(w, "Error creating file entry", http.StatusInternalServerError)
+		return
+	}
+
+	// Update user document
+	_, err = collection.UpdateOne(
+		ctx,
+		bson.M{"username": username},
+		bson.M{
+			"$push": bson.M{
+				"files": string(newFileJSON),
+			},
+		},
+	)
+	if err != nil {
+		http.Error(w, "Error updating user files", http.StatusInternalServerError)
+		return
+	}
+
+
+
+	
 
 	// Upload the JSON file to IPFS
 	jsonFile, err := os.Open(jsonFilePath)
