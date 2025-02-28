@@ -39,7 +39,7 @@ func enableCORS(next http.Handler) http.Handler {
 }
 
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
-
+	println("request: ", r)
 	db := database.NewMongoDB(config.MongoURI)
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)

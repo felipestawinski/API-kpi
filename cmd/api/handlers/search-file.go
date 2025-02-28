@@ -1,0 +1,83 @@
+package handlers
+
+import (
+    "context"
+    "encoding/json"
+    "net/http"
+    "time"
+	"fmt"	
+    "github.com/BloxBerg-UTFPR/API-Blockchain/models"
+    "github.com/BloxBerg-UTFPR/API-Blockchain/pkg/config"
+    "github.com/BloxBerg-UTFPR/API-Blockchain/pkg/database"
+    "go.mongodb.org/mongo-driver/bson"
+)
+
+type FileInfo struct {
+    ID              int    `json:"id" bson:"id"`
+    Filename        string `json:"filename" bson:"filename"`
+    Institution     string `json:"institution" bson:"institution"`
+    ContractAddress string `json:"contractAddress" bson:"contractAddress"`
+    TxHash         string `json:"txHash" bson:"txHash"`
+    IfpsHash       string `json:"ifpsHash" bson:"ifpsHash"`
+}
+
+func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
+    // Parse the institution from the request body
+    var request struct {
+		Institution string `json:"institution"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+	println("request institution: ", request.Institution)
+
+    if request.Institution == "" {
+        http.Error(w, "institution is required", http.StatusBadRequest)
+        return
+    }
+
+    // Connect to the database
+    db := database.NewMongoDB(config.MongoURI)
+    collection := db.Database(database.DbName).Collection(database.CollectionName)
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    // Find all users with matching institution
+    cursor, err := collection.Find(ctx, bson.M{"institution": request.Institution})
+    if err != nil {
+        http.Error(w, "Error finding users", http.StatusInternalServerError)
+        return
+    }
+    defer cursor.Close(ctx)
+
+    var allFiles []FileInfo
+    for cursor.Next(ctx) {
+        var user models.User
+        if err := cursor.Decode(&user); err != nil {
+            fmt.Printf("Error decoding user: %v\n", err)
+            continue
+        }
+
+        // Parse files for this user
+        for _, fileStr := range user.Files {
+            var fileInfo FileInfo
+            if err := json.Unmarshal([]byte(fileStr), &fileInfo); err != nil {
+                fmt.Printf("Error parsing file info: %v\n", err)
+                continue
+            }
+            allFiles = append(allFiles, fileInfo)
+        }
+    }
+
+    if len(allFiles) == 0 {
+        http.Error(w, "No files found for this institution", http.StatusNotFound)
+        return
+    }
+
+    // Return all parsed files in JSON format
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string][]FileInfo{
+        "files": allFiles,
+    })
+}

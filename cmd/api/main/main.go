@@ -24,19 +24,25 @@ func enableCORS(next http.Handler) http.Handler {
 }
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal(".env file couldn't be loaded")
-	}
-	// Rotas
-	http.Handle("/register", enableCORS(http.HandlerFunc(handlers.RegisterHandler)))
-	http.HandleFunc("/login", handlers.LoginHandler)
-	http.HandleFunc("/upload", handlers.UploadFileHandler)
-	http.HandleFunc("/files", handlers.GetFilesHandler)
-	http.HandleFunc("/blockchain/{method}", handlers.BlockchainInteraction)
+    // Add error handling for server startup
+    err := godotenv.Load()
+    if err != nil {
+        log.Fatal(".env file couldn't be loaded")
+    }
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+    // Move print before ListenAndServe
+    fmt.Println("Server starting on port 8080")
 
-	fmt.Println("Server starting on port 8080")
+    // Rotas
+    http.Handle("/register", enableCORS(http.HandlerFunc(handlers.RegisterHandler)))
+    http.HandleFunc("/login", handlers.LoginHandler)
+    http.HandleFunc("/upload", handlers.UploadFileHandler)
+    http.HandleFunc("/files", handlers.GetFilesHandler)
+	http.HandleFunc("/search-file", handlers.SearchFilesHandler)
+    http.HandleFunc("/blockchain/{method}", handlers.BlockchainInteraction)
+
+    if err := http.ListenAndServe(":8080", nil); err != nil {
+        log.Fatal("Server failed to start:", err)
+    }
 }
 

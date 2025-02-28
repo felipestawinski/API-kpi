@@ -35,12 +35,12 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Find by username
+	// Find by email
 	var user models.User
-	err := collection.FindOne(ctx, bson.M{"username": loginUser.Username}).Decode(&user)
+	err := collection.FindOne(ctx, bson.M{"email": loginUser.Email}).Decode(&user)
 	if err != nil {
 		fmt.Println("aqui1")
-		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
 
@@ -69,9 +69,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// Send the token as a response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
+		"username": user.Username,
+		"institution": "UTFPR",
 		"token":      tokenString,
 		"permission": user.Permission,
 	})
 
-	fmt.Fprintln(w, "Login successful")
+	//fmt.Fprintln(w, "Login successful")
 }

@@ -42,7 +42,6 @@ var readMethods = map[string]bool{
 func BlockchainInteraction(w http.ResponseWriter, r *http.Request) {
 	//Make sure to remove the prefix '0x' of private key 
 	//Eg.: 0xb13b0008c5cb0379f1d3a427bbfc75838a50eea795cf549c17b25e2c350c2e83 -> b13b0008c5cb0379f1d3a427bbfc75838a50eea795cf549c17b25e2c350c2e83
-	//contractAddress := "0x5BcC1E2133119cb819c97418B73C770727001FBd"
 
 	//contrato vitao
 	contractAddress := "0x473f8eA5Ce1F35acf7Eb61A6D4b74C8f5cf2f362"

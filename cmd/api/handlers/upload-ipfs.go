@@ -87,7 +87,6 @@ func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 }
 
 // uploadFileHandler handles the HTTP request for file upload
-// uploadFileHandler handles the HTTP request for file upload
 func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 
@@ -98,13 +97,44 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	username := r.FormValue("username")
+	fmt.Println("username", username)
+    if username == "" {
+        http.Error(w, "Username is required", http.StatusBadRequest)
+        return
+    }
+
+	institution := r.FormValue("institution")
+	fmt.Println("institution", institution)
+    if institution == "" {
+        http.Error(w, "Institution is required", http.StatusBadRequest)
+        return
+    }
+
+	db := database.NewMongoDB(config.MongoURI)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	collection := db.Database(database.DbName).Collection(database.CollectionName)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user models.User
+	err := collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
 	fmt.Printf("Request received: %+v\n", r)
 
 	fmt.Printf("Request received:\nMethod: %s\nHeaders: %v\nContent-Type: %s\n", 
 		r.Method, r.Header, r.Header.Get("Content-Type"))
 
 
-	err := r.ParseMultipartForm(10 << 20) // Limit your max input length!
+	err = r.ParseMultipartForm(10 << 20) // Limit your max input length!
 	if err != nil {
 		http.Error(w, "Error parsing multipart form", http.StatusInternalServerError)
 		fmt.Printf("Error parsing multipart form: %v\n", err)
@@ -145,17 +175,11 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
-	//ipfs_hash check
-	//nome do arquivo check
-	//enderco do contrato -- 
-	//nome da instituicao -- check
-	//tx hash -- still missing - chamar o PostData
-	//http://localhost:8080/blockchain/PostData?entity="UTFPR"&uri="https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/QmeKbMkU2nKoF22d18q2yLtd9qCnr2mL7W5PnDqpQ6D2sa"
 
 
 	// Format the blockchain POST URL
 	blockchainURL := fmt.Sprintf("http://localhost:8080/blockchain/PostData?entity=%s&uri=%s", 
-	url.QueryEscape("UTFPR"), 
+	url.QueryEscape(institution), 
 	url.QueryEscape(uri))
 
 	// Make the POST request
@@ -184,10 +208,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	IfpsHash string `json:"ifpsHash" bson:"ifpsHash"`
 	}
 
-	// Store the transaction hash
-	institution := "UTFPR"
-	username := "teste"
-		// Define struct for JSON response
+	// Define struct for JSON response
 	type BlockchainResponse struct {
 		TxHash string `json:"txHash"`
 	}
@@ -203,27 +224,6 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	txHash := response.TxHash
 	fmt.Printf("txHash: %s\n", txHash)
 	contractAddress := "0x473f8eA5Ce1F35acf7Eb61A6D4b74C8f5cf2f362"
-	//ifpsHash
-	//handler.Filename
-
-	db := database.NewMongoDB(config.MongoURI)
-	if r.Method != http.MethodPost {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Get user collection
-	collection := db.Database(database.DbName).Collection(database.CollectionName)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Find user
-	var user models.User
-	err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
-	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
-		return
-	}
 
 	// Determine new ID
 	newID := 1
@@ -277,26 +277,22 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 
-
-	
-
 	// Upload the JSON file to IPFS
-	jsonFile, err := os.Open(jsonFilePath)
-	if err != nil {
-		http.Error(w, "Error opening JSON file", http.StatusInternalServerError)
-		return
-	}
-	defer jsonFile.Close()
-	jsonIpfsHash, err := uploadFileToPinata(jsonFile, handler.Filename+".json")
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error uploading JSON file: %v", err), http.StatusInternalServerError)
-		return
-	}
+	// jsonFile, err := os.Open(jsonFilePath)
+	// if err != nil {
+	// 	http.Error(w, "Error opening JSON file", http.StatusInternalServerError)
+	// 	return
+	// }
+	// defer jsonFile.Close()
+	// //jsonIpfsHash, err := uploadFileToPinata(jsonFile, handler.Filename+".json")
+	// if err != nil {
+	// 	http.Error(w, fmt.Sprintf("Error uploading JSON file: %v", err), http.StatusInternalServerError)
+	// 	return
+	// }
 
 	// Respond with both IPFS hashes
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"fileIpfsHash": ipfsHash,
-		"jsonIpfsHash": jsonIpfsHash,
+		"fileId": fmt.Sprintf("%d", newID), //convert to int
 	})
 }
