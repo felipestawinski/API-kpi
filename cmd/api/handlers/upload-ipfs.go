@@ -182,7 +182,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	url.QueryEscape(institution), 
 	url.QueryEscape(uri))
 
-	// Make the POST request
+	// Call PostData method on blockchain
 	resp, err := http.Post(blockchainURL, "application/json", nil)
 	if err != nil {
 	http.Error(w, fmt.Sprintf("Error calling blockchain: %v", err), http.StatusInternalServerError)
@@ -200,12 +200,12 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Create file info struct
 	type FileInfo struct {
-	ID       int    `json:"id" bson:"id"`
-	Filename string `json:"filename" bson:"filename"`
-	Institution string `json:"institution" bson:"institution"`
-	ContractAddress string `json:"contractAddress" bson:"contractAddress"`
-	TxHash   string `json:"txHash" bson:"txHash"`
-	IfpsHash string `json:"ifpsHash" bson:"ifpsHash"`
+		ID       int    `json:"id" bson:"id"`
+		Filename string `json:"filename" bson:"filename"`
+		Institution string `json:"institution" bson:"institution"`
+		Writer string `json:"writer" bson:"writer"`
+		Date string `json:"date" bson:"date"`
+		FileAddress string `json:"fileAddress" bson:"fileAddress"`
 	}
 
 	// Define struct for JSON response
@@ -223,7 +223,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	// Get clean hash value
 	txHash := response.TxHash
 	fmt.Printf("txHash: %s\n", txHash)
-	contractAddress := "0x473f8eA5Ce1F35acf7Eb61A6D4b74C8f5cf2f362"
+	//contractAddress := "0x473f8eA5Ce1F35acf7Eb61A6D4b74C8f5cf2f362"
 
 	// Determine new ID
 	newID := 1
@@ -247,9 +247,9 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		ID:       newID,
 		Filename: handler.Filename,
 		Institution: institution,
-		ContractAddress: contractAddress,
-		TxHash:   txHash,
-		IfpsHash: ipfsHash,
+		Writer: username,
+		Date: time.Now().Format("2006-01-02 15:04:05"),
+		FileAddress: uri,
 	}
 
 	fmt.Printf("Inserting new file: %+v\n", newFile)
@@ -290,7 +290,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	// 	return
 	// }
 
-	// Respond with both IPFS hashes
+	// Respond with the file ID
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"fileId": fmt.Sprintf("%d", newID), //convert to int

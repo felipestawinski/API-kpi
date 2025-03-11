@@ -13,12 +13,12 @@ import (
 )
 
 type FileInfo struct {
-    ID              int    `json:"id" bson:"id"`
-    Filename        string `json:"filename" bson:"filename"`
-    Institution     string `json:"institution" bson:"institution"`
-    ContractAddress string `json:"contractAddress" bson:"contractAddress"`
-    TxHash         string `json:"txHash" bson:"txHash"`
-    IfpsHash       string `json:"ifpsHash" bson:"ifpsHash"`
+	ID       int    `json:"id" bson:"id"`
+	Filename string `json:"filename" bson:"filename"`
+	Institution string `json:"institution" bson:"institution"`
+	Writer string `json:"writer" bson:"writer"`
+	Date string `json:"date" bson:"date"`
+	FileAddress string `json:"fileAddress" bson:"fileAddress"`
 }
 
 func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
