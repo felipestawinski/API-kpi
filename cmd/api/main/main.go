@@ -39,6 +39,7 @@ func main() {
     http.HandleFunc("/upload", handlers.UploadFileHandler)
     http.HandleFunc("/files", handlers.GetFilesHandler)
 	http.HandleFunc("/search-file", handlers.SearchFilesHandler)
+	http.HandleFunc("/user-info", handlers.UserInfoHandler)
     http.HandleFunc("/blockchain/{method}", handlers.BlockchainInteraction)
 
     if err := http.ListenAndServe(":8080", nil); err != nil {

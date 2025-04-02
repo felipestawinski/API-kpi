@@ -89,23 +89,29 @@ func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 // uploadFileHandler handles the HTTP request for file upload
 func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
-
-	//UserAuthorized(w, r)
+	//Check jwt key
+	UserAuthorized(w, r)
 	
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
+	filename := r.FormValue("fileName")
+	fmt.Println("filename: ", filename)
+    if filename == "" {
+        http.Error(w, "Filename is required", http.StatusBadRequest)
+        return
+    }
 
 	username := r.FormValue("username")
-	fmt.Println("username", username)
+	fmt.Println("username: ", username)
     if username == "" {
         http.Error(w, "Username is required", http.StatusBadRequest)
         return
     }
 
 	institution := r.FormValue("institution")
-	fmt.Println("institution", institution)
+	fmt.Println("institution: ", institution)
     if institution == "" {
         http.Error(w, "Institution is required", http.StatusBadRequest)
         return
@@ -167,7 +173,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Upload the original file to IPFS
-	ipfsHash, err := uploadFileToPinata(file, handler.Filename)
+	ipfsHash, err := uploadFileToPinata(file, filename)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error uploading file: %v", err), http.StatusInternalServerError)
 		fmt.Printf("Error uploading file to Pinata: %v\n", err)
@@ -245,7 +251,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	// Create new file entry
 	newFile := FileInfo{
 		ID:       newID,
-		Filename: handler.Filename,
+		Filename: filename,
 		Institution: institution,
 		Writer: username,
 		Date: time.Now().Format("2006-01-02 15:04:05"),

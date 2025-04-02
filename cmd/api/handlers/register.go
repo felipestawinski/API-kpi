@@ -90,8 +90,8 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	user.Password = string(hashedPassword)
 
-	// Default permission level
-	user.Permission = 3
+	// "Pending" permission level
+	user.Permission = 0
 
 	// Insere novo usuário
 	_, err = collection.InsertOne(ctx, user)

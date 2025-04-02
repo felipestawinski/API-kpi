@@ -22,18 +22,25 @@ type FileInfo struct {
 }
 
 func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
+    //Check jwt key
+    UserAuthorized(w, r)
+    
     // Parse the institution from the request body
     var request struct {
-		Institution string `json:"institution"`
+        Institution string `json:"institution"`
+        Id        string `json:"id"`
+        FileName string `json:"filename"`
     }
     if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+        http.Error(w, err.Error(), http.StatusBadRequest)
         return
     }
-	println("request institution: ", request.Institution)
+    fmt.Println("request institution: ", request.Institution)
+    fmt.Println("request ID: ", request.Id)
+    fmt.Println("request fileName: ", request.FileName)
 
-    if request.Institution == "" {
-        http.Error(w, "institution is required", http.StatusBadRequest)
+    if request.Institution == "" && request.Id == "" && request.FileName == "" {
+        http.Error(w, "No parameter provided!", http.StatusBadRequest)
         return
     }
 
@@ -43,8 +50,8 @@ func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    // Find all users with matching institution
-    cursor, err := collection.Find(ctx, bson.M{"institution": request.Institution})
+    // Find all users
+    cursor, err := collection.Find(ctx, bson.M{})
     if err != nil {
         http.Error(w, "Error finding users", http.StatusInternalServerError)
         return
@@ -66,7 +73,16 @@ func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
                 fmt.Printf("Error parsing file info: %v\n", err)
                 continue
             }
-            allFiles = append(allFiles, fileInfo)
+            
+            // Only include files that match the requested institution (if given)
+            if fileInfo.Institution == request.Institution {
+                allFiles = append(allFiles, fileInfo)
+            }
+
+            // Only include files that match the requested filename (if given)
+            if fileInfo.Filename == request.FileName {
+                allFiles = append(allFiles, fileInfo)
+            }
         }
     }
 
@@ -75,7 +91,7 @@ func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Return all parsed files in JSON format
+    // Return all matching files in JSON format
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(map[string][]FileInfo{
         "files": allFiles,

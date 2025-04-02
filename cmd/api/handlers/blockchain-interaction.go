@@ -46,7 +46,6 @@ func BlockchainInteraction(w http.ResponseWriter, r *http.Request) {
 	//contrato vitao
 	contractAddress := "0x473f8eA5Ce1F35acf7Eb61A6D4b74C8f5cf2f362"
 	
-	//UserAuthorized(w, r)
 
 	action := r.PathValue("method")
 	if action == "" {

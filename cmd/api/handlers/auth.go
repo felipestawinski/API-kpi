@@ -13,12 +13,11 @@ import (
 )
 
 
-
-// welcomeHandler handles welcome requests for logged-in users
 func UserAuthorized(w http.ResponseWriter, r *http.Request) {
 
 	//Check for the Authorization header
-	tokenStr := r.Header.Get("Authorization")
+	tokenStr := r.Header.Get("jwtToken")
+	println("Token jwt: ", tokenStr)
 	if tokenStr == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -31,7 +30,7 @@ func UserAuthorized(w http.ResponseWriter, r *http.Request) {
 		return jwtKey, nil
 	})
 	if err != nil || !token.Valid {
-		fmt.Println("TOKEN:", token)
+		fmt.Println("Erro: chave jwt inválida", token)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -49,10 +48,13 @@ func UserAuthorized(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check permission level
-	if user.Permission <= 2 {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	// switch user.Permission {
+	// 	case StatusPending:
+	// 		http.Error(w, "Pending", http.StatusForbidden)
+	// 		return
+	// 	case StatusReaderTimeBased:
+	// }
+
 
 	return
 }
