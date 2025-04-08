@@ -90,7 +90,7 @@ func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	//Check jwt key
-	UserAuthorized(w, r)
+	UserAuthorized(w, r, models.UserStatus(4))
 	
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
@@ -254,7 +254,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		Filename: filename,
 		Institution: institution,
 		Writer: username,
-		Date: time.Now().Format("2006-01-02 15:04:05"),
+		Date: time.Now().Format("2006-01-02"),
 		FileAddress: uri,
 	}
 

@@ -23,7 +23,7 @@ type FileInfo struct {
 
 func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
     //Check jwt key
-    UserAuthorized(w, r)
+    UserAuthorized(w, r, models.UserStatus(1))
     
     // Parse the institution from the request body
     var request struct {

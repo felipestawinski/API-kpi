@@ -13,7 +13,7 @@ import (
 )
 
 
-func UserAuthorized(w http.ResponseWriter, r *http.Request) {
+func UserAuthorized(w http.ResponseWriter, r *http.Request, permissionLevel models.UserStatus) {
 
 	//Check for the Authorization header
 	tokenStr := r.Header.Get("jwtToken")

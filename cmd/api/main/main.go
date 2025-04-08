@@ -41,6 +41,9 @@ func main() {
 	http.HandleFunc("/search-file", handlers.SearchFilesHandler)
 	http.HandleFunc("/user-info", handlers.UserInfoHandler)
     http.HandleFunc("/blockchain/{method}", handlers.BlockchainInteraction)
+	http.HandleFunc("/users", handlers.GetUsersHandler)
+	http.HandleFunc("/pending-users", handlers.GetPendingUsersHandler)
+	http.HandleFunc("/change-permission", handlers.ChangePermissionHandler)
 
     if err := http.ListenAndServe(":8080", nil); err != nil {
         log.Fatal("Server failed to start:", err)

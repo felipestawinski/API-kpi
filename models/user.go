@@ -8,27 +8,30 @@ const (
     StatusPending          UserStatus = 0
     StatusReaderTimeBased  UserStatus = 1
     StatusReaderAmountBased UserStatus = 2
-    StatusEditorTimeBased  UserStatus = 3
-    StatusEditorAmountBased UserStatus = 4
-    StatusEditorUnlimited  UserStatus = 5
-    StatusAdmin            UserStatus = 6
+    StatusReaderUnlimited  UserStatus = 3
+    StatusEditorTimeBased  UserStatus = 4
+    StatusEditorAmountBased UserStatus = 5
+    StatusEditorUnlimited  UserStatus = 6
+    StatusAdmin            UserStatus = 7
 )
 
 // String returns the string representation of a UserStatus
 func (s UserStatus) String() string {
     switch s {
     case StatusPending:
-        return "Pending"
+        return "Pendente"
     case StatusReaderTimeBased:
-        return "Reader (Time Based)"
+        return "Leitor (Por Tempo)"
     case StatusReaderAmountBased:
-        return "Reader (Amount Based)"
+        return "Leitor (Por Requisição)"
+    case StatusReaderUnlimited:
+        return "Leitor (Permanente)"
     case StatusEditorTimeBased:
-        return "Editor (Time Based)"
+        return "Editor (Por Tempo)"
     case StatusEditorAmountBased:
-        return "Editor (Amount Based)"
+        return "Editor (Por Requisição)"
     case StatusEditorUnlimited:
-        return "Editor (Unlimited)"
+        return "Editor (Permanente)"
     case StatusAdmin:
         return "Administrator"
     default:
@@ -43,6 +46,8 @@ type User struct {
 	Institution string `json:"institution" bson:"institution"`
 	Role        string `json:"role" bson:"role"`
 	Permission  int    `json:"permission" bson:"permission"`
+    AccessTime  int    `json:"accesstime" bson:"accesstime"`
+    ReqAmount   int    `json:"reqamount" bson:"reqamount"`
 	ID          string `json:"id,omitempty" bson:"_id,omitempty"`
 	Files []    string `json:"files,omitempty" bson:"files,omitempty"`
 }

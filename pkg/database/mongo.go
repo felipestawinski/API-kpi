@@ -19,7 +19,7 @@ func NewMongoDB(uri string) *mongo.Client {
 
     client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
     if err != nil {
-        panic(err) // or handle error as your application requires
+        panic(err)
     }
 
     return client

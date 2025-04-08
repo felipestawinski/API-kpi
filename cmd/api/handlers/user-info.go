@@ -14,7 +14,7 @@ import (
 
 func UserInfoHandler(w http.ResponseWriter, r *http.Request) {
 
-	UserAuthorized(w, r)
+	UserAuthorized(w, r, models.UserStatus(1))
 	
 	var request struct {
 		Username string `json:"username"`
@@ -45,7 +45,7 @@ func UserInfoHandler(w http.ResponseWriter, r *http.Request) {
 		"username":     user.Username,
 		"institution":  user.Institution,
 		"email":        user.Email,
-	    "accessType":  user.Permission,
+	    "accessType":  models.UserStatus(user.Permission).String(),
 		"position"	: user.Role,
 	    "accessTime": "0",})
 
