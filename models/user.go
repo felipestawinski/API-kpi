@@ -46,7 +46,7 @@ type User struct {
 	Institution string `json:"institution" bson:"institution"`
 	Role        string `json:"role" bson:"role"`
 	Permission  int    `json:"permission" bson:"permission"`
-    AccessTime  int    `json:"accesstime" bson:"accesstime"`
+    AccessTime  string `json:"accesstime" bson:"accesstime"`
     ReqAmount   int    `json:"reqamount" bson:"reqamount"`
 	ID          string `json:"id,omitempty" bson:"_id,omitempty"`
 	Files []    string `json:"files,omitempty" bson:"files,omitempty"`

@@ -47,7 +47,7 @@ func UserInfoHandler(w http.ResponseWriter, r *http.Request) {
 		"email":        user.Email,
 	    "accessType":  models.UserStatus(user.Permission).String(),
 		"position"	: user.Role,
-	    "accessTime": "0",})
+	    "accessTime": user.AccessTime,})
 
 	return
 }

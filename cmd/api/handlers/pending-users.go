@@ -30,10 +30,10 @@ type UserPendingRequest struct {
 func GetPendingUsersHandler(w http.ResponseWriter, r *http.Request) {
 
     // Check if the user is authorized
-    UserAuthorized(w, r, models.UserStatus(6))
+    UserAuthorized(w, r, models.UserStatus(0))
 
     // Parse the request body
-    var request UserRequest
+    var request UserPendingRequest
     if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
         http.Error(w, "Error decoding request body", http.StatusBadRequest)
         return

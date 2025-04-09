@@ -11,13 +11,14 @@ import (
     "time"
     "fmt"
     "strings"
+    "strconv"
 )
 
 type ChangePermissionRequest struct {
     Username    string `json:"username"`
     Permission  string `json:"permission"`
-    PermissionTime int `json:"permissiontime"`
-    RequestAmount int `json:"requestamount"`
+    PermissionTime string `json:"permissionQuantity"`
+    RequestAmount string `json:"requestamount"`
 }
 
 func ChangePermissionHandler(w http.ResponseWriter, r *http.Request) {
@@ -43,22 +44,28 @@ func ChangePermissionHandler(w http.ResponseWriter, r *http.Request) {
 
     // Convert permission string to UserStatus integer
     var permissionInt int
+    var permissionTimeNeeded bool
+    //var permissionAmountNeeded bool
     switch strings.ToLower(request.Permission) {
     case "pending", "pendente":
         permissionInt = int(models.StatusPending)
     case "reader time based", "leitor (por tempo)":
         permissionInt = int(models.StatusReaderTimeBased)
+        permissionTimeNeeded = true
     case "reader amount based", "leitor (por requisição)":
         permissionInt = int(models.StatusReaderAmountBased)
+        //permissionAmountNeeded = true
     case "reader unlimited", "leitor (permanente)":
         permissionInt = int(models.StatusReaderUnlimited)
     case "editor time based", "editor (por tempo)":
         permissionInt = int(models.StatusEditorTimeBased)
+        permissionTimeNeeded = true
     case "editor amount based", "editor (por requisição)":
+        //permissionAmountNeeded = true
         permissionInt = int(models.StatusEditorAmountBased)
     case "editor unlimited", "editor (permanente)":
         permissionInt = int(models.StatusEditorUnlimited)
-    case "admin", "administrator":
+    case "admin", "administrador":
         permissionInt = int(models.StatusAdmin)
     default:
         http.Error(w, "Invalid permission level", http.StatusBadRequest)
@@ -70,18 +77,33 @@ func ChangePermissionHandler(w http.ResponseWriter, r *http.Request) {
     collection := db.Database(database.DbName).Collection(database.CollectionName)
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
+    ptime, err := strconv.Atoi(request.PermissionTime)
 
+    if err != nil {
+        // Handle the error (e.g., log it, return it, etc.)
+        fmt.Printf("Error updating user permission: %v\n", err)
+    }
+
+    if permissionTimeNeeded && ptime <= 0 {
+        http.Error(w, "Permission time is required for this permission level", http.StatusBadRequest)
+        return
+    }
+
+    // if permissionAmountNeeded && ptime <= 0 {
+    //     http.Error(w, "Request amount is required for this permission level", http.StatusBadRequest)
+    //     return
+    // }
     // Create update document
     update := bson.M{"$set": bson.M{"permission": permissionInt}}
     
     // Add time-based or amount-based parameters if provided
-    if request.PermissionTime > 0 {
+    if ptime > 0 {
         update["$set"].(bson.M)["accesstime"] = request.PermissionTime
     }
     
-    if request.RequestAmount > 0 {
-        update["$set"].(bson.M)["reqamount"] = request.RequestAmount
-    }
+    // if strconv.Atoi(request.RequestAmount) > 0 {
+    //     update["$set"].(bson.M)["reqamount"] = request.RequestAmount
+    // }
 
     // Update the user in the database
     result, err := collection.UpdateOne(
