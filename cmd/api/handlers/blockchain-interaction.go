@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
-
+	"os"
 	"github.com/BloxBerg-UTFPR/API-Blockchain/cmd/api/contract"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -43,9 +43,8 @@ func BlockchainInteraction(w http.ResponseWriter, r *http.Request) {
 	//Make sure to remove the prefix '0x' of private key 
 	//Eg.: 0xb13b0008c5cb0379f1d3a427bbfc75838a50eea795cf549c17b25e2c350c2e83 -> b13b0008c5cb0379f1d3a427bbfc75838a50eea795cf549c17b25e2c350c2e83
 
-	//contrato vitao
-	contractAddress := "0x473f8eA5Ce1F35acf7Eb61A6D4b74C8f5cf2f362"
-	
+	//contrato do Victor - mover para .env
+	contractAddress := os.Getenv("CONTRACT")
 
 	action := r.PathValue("method")
 	if action == "" {
@@ -73,11 +72,9 @@ func BlockchainInteraction(w http.ResponseWriter, r *http.Request) {
 	if readMethods[action] {
 		result, err = callReadMethod(conn, action, params...)
 	} else {
-		//accountAddress := "0x42A2069C3F18DCd7e3a61276A8401bE431958239"
-		//privateKey := "a5058f2733cf8c615730962e75ed4af277df4983a9243298cd1c77afa621681f"
 
 		//privateKey vitao
-		privateKey := "65ec240a4866e5f3aa86aef6da44daea4eed19172b9991c6244ba87865de955f"
+		privateKey := os.Getenv("PRIVATE_KEY")
 		auth := getAccountAuth(ethclient, privateKey)
 		txn, err = callWriteMethod(conn, action, auth, params...)
 	}
