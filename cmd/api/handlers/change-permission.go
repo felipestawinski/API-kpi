@@ -23,7 +23,9 @@ type ChangePermissionRequest struct {
 
 func ChangePermissionHandler(w http.ResponseWriter, r *http.Request) {
     // Check if the user is authorized (only admins can change permissions)
-    UserAuthorized(w, r, models.StatusAdmin)
+    if !UserAuthorized(w, r, models.UserStatus(7)) {
+        return
+    }
 
     // Parse the request body
     var request ChangePermissionRequest

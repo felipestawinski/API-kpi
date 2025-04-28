@@ -90,7 +90,9 @@ func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	//Check jwt key
-	UserAuthorized(w, r, models.UserStatus(4))
+	if !UserAuthorized(w, r, models.UserStatus(4)) {
+		return
+	}
 	
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
@@ -134,13 +136,9 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("Request received: %+v\n", r)
+	fmt.Printf("Uploading file to IPFS")
 
-	fmt.Printf("Request received:\nMethod: %s\nHeaders: %v\nContent-Type: %s\n", 
-		r.Method, r.Header, r.Header.Get("Content-Type"))
-
-
-	err = r.ParseMultipartForm(10 << 20) // Limit your max input length!
+	err = r.ParseMultipartForm(10 << 20) // Limit your max input length
 	if err != nil {
 		http.Error(w, "Error parsing multipart form", http.StatusInternalServerError)
 		fmt.Printf("Error parsing multipart form: %v\n", err)

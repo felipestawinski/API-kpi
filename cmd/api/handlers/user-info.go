@@ -14,7 +14,9 @@ import (
 
 func UserInfoHandler(w http.ResponseWriter, r *http.Request) {
 
-	UserAuthorized(w, r, models.UserStatus(1))
+	if !UserAuthorized(w, r, models.UserStatus(1)) {
+		return
+	}
 	
 	var request struct {
 		Username string `json:"username"`

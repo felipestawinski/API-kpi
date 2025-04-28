@@ -30,7 +30,9 @@ type UserPendingRequest struct {
 func GetPendingUsersHandler(w http.ResponseWriter, r *http.Request) {
 
     // Check if the user is authorized
-    UserAuthorized(w, r, models.UserStatus(0))
+    if !UserAuthorized(w, r, models.UserStatus(7)) {
+        return 
+    }
 
     // Parse the request body
     var request UserPendingRequest
