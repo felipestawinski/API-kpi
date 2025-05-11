@@ -1,8 +1,10 @@
 package main
+
 import (
 	"fmt"
 	"log"
 	"net/http"
+
 	"github.com/BloxBerg-UTFPR/API-Blockchain/cmd/api/handlers"
 	"github.com/joho/godotenv"
 )
@@ -24,29 +26,28 @@ func enableCORS(next http.Handler) http.Handler {
 }
 
 func main() {
-    // Add error handling for server startup
-    err := godotenv.Load()
-    if err != nil {
-        log.Fatal(".env file couldn't be loaded")
-    }
+	// Add error handling for server startup
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal(".env file couldn't be loaded")
+	}
 
-    // Move print before ListenAndServe
-    fmt.Println("Server starting on port 8080")
+	// Move print before ListenAndServe
+	fmt.Println("Server starting on port 8080")
 
-    // Rotas
-    http.Handle("/register", enableCORS(http.HandlerFunc(handlers.RegisterHandler)))
-    http.HandleFunc("/login", handlers.LoginHandler)
-    http.HandleFunc("/upload", handlers.UploadFileHandler)
-    http.HandleFunc("/files", handlers.GetFilesHandler)
+	// Rotas
+	http.Handle("/register", enableCORS(http.HandlerFunc(handlers.RegisterHandler)))
+	http.HandleFunc("/login", handlers.LoginHandler)
+	http.HandleFunc("/upload", handlers.UploadFileHandler)
+	http.HandleFunc("/files", handlers.GetFilesHandler)
 	http.HandleFunc("/search-file", handlers.SearchFilesHandler)
 	http.HandleFunc("/user-info", handlers.UserInfoHandler)
-    http.HandleFunc("/blockchain/{method}", handlers.BlockchainInteraction)
+	http.HandleFunc("/blockchain/{method}", handlers.BlockchainInteraction)
 	http.HandleFunc("/users", handlers.GetUsersHandler)
 	http.HandleFunc("/pending-users", handlers.GetPendingUsersHandler)
 	http.HandleFunc("/change-permission", handlers.ChangePermissionHandler)
 
-    if err := http.ListenAndServe(":8080", nil); err != nil {
-        log.Fatal("Server failed to start:", err)
-    }
+	if err := http.ListenAndServe("0.0.0.0:8080", nil); err != nil {
+		log.Fatal("Server failed to start:", err)
+	}
 }
-
