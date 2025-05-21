@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"github.com/golang-jwt/jwt/v4"
 	"time"
-	"github.com/BloxBerg-UTFPR/API-Blockchain/pkg/database"
-	"github.com/BloxBerg-UTFPR/API-Blockchain/pkg/config"
-	"github.com/BloxBerg-UTFPR/API-Blockchain/models"
+	"github.com/felipestawinski/API-kpi/pkg/database"
+	"github.com/felipestawinski/API-kpi/pkg/config"
+	"github.com/felipestawinski/API-kpi/models"
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
 )

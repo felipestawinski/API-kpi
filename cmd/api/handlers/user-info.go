@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"fmt"
-	"github.com/BloxBerg-UTFPR/API-Blockchain/models"
-    "github.com/BloxBerg-UTFPR/API-Blockchain/pkg/config"
-    "github.com/BloxBerg-UTFPR/API-Blockchain/pkg/database"
+	"github.com/felipestawinski/API-kpi/models"
+    "github.com/felipestawinski/API-kpi/pkg/config"
+    "github.com/felipestawinski/API-kpi/pkg/database"
     "go.mongodb.org/mongo-driver/bson"
 	"time"
 )

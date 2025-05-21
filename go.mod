@@ -1,4 +1,4 @@
-module github.com/BloxBerg-UTFPR/API-Blockchain
+module github.com/felipestawinski/API-kpi
 
 go 1.22.3
 
