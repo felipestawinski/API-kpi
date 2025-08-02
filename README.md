@@ -62,7 +62,7 @@ API_KEY = "yourPinataApiKey"
 API_SECRET "yourPinataApiSecret"
 JWT_TOKEN "yourJwtToken"
 
-2 - go gun cmd/api/main/main.go
+2 - go run cmd/api/main/main.go
 
 3 - Send a request to http://localhost:8080/register to register
 
