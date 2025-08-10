@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"strings"
 	"os"
-	"github.com/BloxBerg-UTFPR/API-Blockchain/cmd/api/contract"
+	"github.com/felipestawinski/API-kpi/cmd/api/contract"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"

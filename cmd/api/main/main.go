@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/BloxBerg-UTFPR/API-Blockchain/cmd/api/handlers"
+	"github.com/felipestawinski/API-kpi/cmd/api/handlers"
 	"github.com/joho/godotenv"
 )
 
