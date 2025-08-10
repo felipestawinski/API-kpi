@@ -16,7 +16,7 @@ import (
 func UserAuthorized(w http.ResponseWriter, r *http.Request, permissionLevel models.UserStatus) bool {
 
 	//Check for the Authorization header
-	tokenStr := r.Header.Get("jwtToken")
+	tokenStr := r.Header.Get("Authorization")
 	println("Token jwt: ", tokenStr)
 	if tokenStr == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)

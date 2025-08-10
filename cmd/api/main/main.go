@@ -11,7 +11,7 @@ import (
 
 func enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
@@ -37,15 +37,16 @@ func main() {
 
 	// Rotas
 	http.Handle("/register", enableCORS(http.HandlerFunc(handlers.RegisterHandler)))
-	http.HandleFunc("/login", handlers.LoginHandler)
-	http.HandleFunc("/upload", handlers.UploadFileHandler)
-	http.HandleFunc("/files", handlers.GetFilesHandler)
-	http.HandleFunc("/search-file", handlers.SearchFilesHandler)
-	http.HandleFunc("/user-info", handlers.UserInfoHandler)
-	http.HandleFunc("/blockchain/{method}", handlers.BlockchainInteraction)
-	http.HandleFunc("/users", handlers.GetUsersHandler)
-	http.HandleFunc("/pending-users", handlers.GetPendingUsersHandler)
-	http.HandleFunc("/change-permission", handlers.ChangePermissionHandler)
+	http.Handle("/login", enableCORS(http.HandlerFunc(handlers.LoginHandler)))
+	http.Handle("/upload", enableCORS(http.HandlerFunc(handlers.UploadFileHandler)))
+	http.Handle("/upload-picture", enableCORS(http.HandlerFunc(handlers.UploadPictureHandler)))
+	http.Handle("/files", enableCORS(http.HandlerFunc(handlers.GetFilesHandler)))
+	http.Handle("/search-file", enableCORS(http.HandlerFunc(handlers.SearchFilesHandler)))
+	http.Handle("/user-info", enableCORS(http.HandlerFunc(handlers.UserInfoHandler)))
+	http.Handle("/blockchain/{method}", enableCORS(http.HandlerFunc(handlers.BlockchainInteraction)))
+	http.Handle("/users", enableCORS(http.HandlerFunc(handlers.GetUsersHandler)))
+	http.Handle("/pending-users", enableCORS(http.HandlerFunc(handlers.GetPendingUsersHandler)))
+	http.Handle("/change-permission", enableCORS(http.HandlerFunc(handlers.ChangePermissionHandler)))
 
 	if err := http.ListenAndServe("0.0.0.0:8080", nil); err != nil {
 		log.Fatal("Server failed to start:", err)

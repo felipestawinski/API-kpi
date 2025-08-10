@@ -8,9 +8,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const MongoURI = "mongodb+srv://edfisic:DwyZQ0wzP3veQEWf@db-1.5di98i7.mongodb.net/?retryWrites=true&w=majority&appName=DB-1"
-const DbName = "Ed_Fisic"
-const CollectionName = "Ed_Fisic"
+const MongoURI = "mongodb://localhost:27017"
+const DbName = "kpidb"
+const CollectionName = "users"
 
 var client *mongo.Client
 

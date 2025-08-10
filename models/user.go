@@ -50,6 +50,7 @@ type User struct {
     ReqAmount   int    `json:"reqamount" bson:"reqamount"`
 	ID          string `json:"id,omitempty" bson:"_id,omitempty"`
 	Files []    string `json:"files,omitempty" bson:"files,omitempty"`
+	ProfilePicture string `json:"profilePicture,omitempty" bson:"profilePicture,omitempty"`
 }
 // Session represents a user session
 type Session struct {

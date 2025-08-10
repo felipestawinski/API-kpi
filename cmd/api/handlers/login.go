@@ -39,7 +39,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	err := collection.FindOne(ctx, bson.M{"email": loginUser.Email}).Decode(&user)
 	if err != nil {
-		fmt.Println("aqui1")
 		http.Error(w, "Invalid email or password", http.StatusUnauthorized)
 		return
 	}
@@ -47,7 +46,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// Compare the hashed password
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginUser.Password))
 	if err != nil {
-		fmt.Println("aqui2")
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
 	}
@@ -70,9 +68,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"username": user.Username,
-		"institution": "UTFPR",
+		"institution": user.Institution,
 		"token":      tokenString,
 		"permission": user.Permission,
+		"role": user.Role,
 	})
 
 	//fmt.Fprintln(w, "Login successful")

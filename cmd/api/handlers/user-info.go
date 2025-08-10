@@ -3,18 +3,19 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"fmt"
-	"github.com/BloxBerg-UTFPR/API-Blockchain/models"
-    "github.com/BloxBerg-UTFPR/API-Blockchain/pkg/config"
-    "github.com/BloxBerg-UTFPR/API-Blockchain/pkg/database"
-    "go.mongodb.org/mongo-driver/bson"
+	"net/http"
 	"time"
+
+	"github.com/BloxBerg-UTFPR/API-Blockchain/models"
+	"github.com/BloxBerg-UTFPR/API-Blockchain/pkg/config"
+	"github.com/BloxBerg-UTFPR/API-Blockchain/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func UserInfoHandler(w http.ResponseWriter, r *http.Request) {
 
-	if !UserAuthorized(w, r, models.UserStatus(1)) {
+	if !UserAuthorized(w, r, models.UserStatus(0)) {
 		return
 	}
 	
@@ -49,7 +50,8 @@ func UserInfoHandler(w http.ResponseWriter, r *http.Request) {
 		"email":        user.Email,
 	    "accessType":  models.UserStatus(user.Permission).String(),
 		"position"	: user.Role,
-	    "accessTime": user.AccessTime,})
+	    "accessTime": user.AccessTime,
+		"profilePicture": user.ProfilePicture,})
 
 	return
 }
