@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"mime/multipart"
 	"os"
 	"github.com/felipestawinski/API-kpi/pkg/config"
@@ -105,19 +104,13 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-	username := r.FormValue("username")
-	fmt.Println("username: ", username)
-    if username == "" {
-        http.Error(w, "Username is required", http.StatusBadRequest)
-        return
-    }
+	tokenStr := r.Header.Get("Authorization")
+	username, err := getUsernameFromToken(tokenStr)
 
-	institution := r.FormValue("institution")
-	fmt.Println("institution: ", institution)
-    if institution == "" {
-        http.Error(w, "Institution is required", http.StatusBadRequest)
-        return
-    }
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
 
 	db := database.NewMongoDB(config.MongoURI)
 	if r.Method != http.MethodPost {
@@ -130,7 +123,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	var user models.User
-	err := collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
@@ -184,26 +177,6 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
 
 
-	// Format the blockchain POST URL
-	blockchainURL := fmt.Sprintf("http://localhost:8080/blockchain/PostData?entity=%s&uri=%s", 
-	url.QueryEscape(institution), 
-	url.QueryEscape(uri))
-
-	// Call PostData method on blockchain
-	resp, err := http.Post(blockchainURL, "application/json", nil)
-	if err != nil {
-	http.Error(w, fmt.Sprintf("Error calling blockchain: %v", err), http.StatusInternalServerError)
-	return
-	}
-	defer resp.Body.Close()
-
-	// Read the response
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-	http.Error(w, fmt.Sprintf("Error reading response: %v", err), http.StatusInternalServerError)
-	return
-	}
-	fmt.Printf("body: %s", body)
 
 	// Create file info struct
 	type FileInfo struct {
@@ -214,23 +187,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		Date string `json:"date" bson:"date"`
 		FileAddress string `json:"fileAddress" bson:"fileAddress"`
 	}
-
-	// Define struct for JSON response
-	type BlockchainResponse struct {
-		TxHash string `json:"txHash"`
-	}
-
-	// Parse JSON response
-	var response BlockchainResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		http.Error(w, fmt.Sprintf("Error parsing response: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	// Get clean hash value
-	txHash := response.TxHash
-	fmt.Printf("txHash: %s\n", txHash)
-	//contractAddress := "0x473f8eA5Ce1F35acf7Eb61A6D4b74C8f5cf2f362"
+	
 
 	// Determine new ID
 	newID := 1
@@ -253,7 +210,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	newFile := FileInfo{
 		ID:       newID,
 		Filename: filename,
-		Institution: institution,
+		Institution: "UTFPR",
 		Writer: username,
 		Date: time.Now().Format("2006-01-02"),
 		FileAddress: uri,
@@ -283,19 +240,6 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
-	// Upload the JSON file to IPFS
-	// jsonFile, err := os.Open(jsonFilePath)
-	// if err != nil {
-	// 	http.Error(w, "Error opening JSON file", http.StatusInternalServerError)
-	// 	return
-	// }
-	// defer jsonFile.Close()
-	// //jsonIpfsHash, err := uploadFileToPinata(jsonFile, handler.Filename+".json")
-	// if err != nil {
-	// 	http.Error(w, fmt.Sprintf("Error uploading JSON file: %v", err), http.StatusInternalServerError)
-	// 	return
-	// }
 
 	// Respond with the file ID
 	w.Header().Set("Content-Type", "application/json")

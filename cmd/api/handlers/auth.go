@@ -39,6 +39,8 @@ func UserAuthorized(w http.ResponseWriter, r *http.Request, permissionLevel mode
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	fmt.Println("Usuário do token: ", claims.Subject)
+
 	// Find user by username
 	var user models.User
 	err = collection.FindOne(ctx, bson.M{"username": claims.Subject}).Decode(&user)

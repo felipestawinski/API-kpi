@@ -72,6 +72,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		"token":      tokenString,
 		"permission": user.Permission,
 		"role": user.Role,
+		"profileImageUrl": user.ProfilePicture,
+		"email": user.Email,
 	})
 
 	//fmt.Fprintln(w, "Login successful")
