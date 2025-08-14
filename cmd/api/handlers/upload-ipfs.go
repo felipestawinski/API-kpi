@@ -97,7 +97,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
-	filename := r.FormValue("fileName")
+	filename := r.FormValue("filename")
 	fmt.Println("filename: ", filename)
     if filename == "" {
         http.Error(w, "Filename is required", http.StatusBadRequest)
