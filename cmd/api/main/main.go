@@ -47,6 +47,7 @@ func main() {
 	http.Handle("/users", enableCORS(http.HandlerFunc(handlers.GetUsersHandler)))
 	http.Handle("/pending-users", enableCORS(http.HandlerFunc(handlers.GetPendingUsersHandler)))
 	http.Handle("/change-permission", enableCORS(http.HandlerFunc(handlers.ChangePermissionHandler)))
+	http.Handle("/analysis-gen", enableCORS(http.HandlerFunc(handlers.AnalysisGenHandler)))
 
 	if err := http.ListenAndServe("0.0.0.0:8080", nil); err != nil {
 		log.Fatal("Server failed to start:", err)
