@@ -38,22 +38,10 @@ func GetFilesHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("files: %v\n", user.Files)
 
-    // Parse each file string into proper JSON objects
-    var filesAsObjects []interface{}
-    for _, fileStr := range user.Files {
-        var fileObj interface{}
-        if err := json.Unmarshal([]byte(fileStr), &fileObj); err != nil {
-            fmt.Printf("Error parsing file JSON: %v\n", err)
-            // If parsing fails, include the raw string
-            filesAsObjects = append(filesAsObjects, fileStr)
-        } else {
-            filesAsObjects = append(filesAsObjects, fileObj)
-        }
-    }
 
     // Return the list of files as proper JSON objects
     w.Header().Set("Content-Type", "application/json")
-    if err := json.NewEncoder(w).Encode(filesAsObjects); err != nil {
+    if err := json.NewEncoder(w).Encode(user.Files); err != nil {
         http.Error(w, err.Error(), http.StatusInternalServerError)
         return
     }

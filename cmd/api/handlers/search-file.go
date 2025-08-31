@@ -12,15 +12,6 @@ import (
     "go.mongodb.org/mongo-driver/bson"
 )
 
-type FileInfo struct {
-	ID       int    `json:"id" bson:"id"`
-	Filename string `json:"filename" bson:"filename"`
-	Institution string `json:"institution" bson:"institution"`
-	Writer string `json:"writer" bson:"writer"`
-	Date string `json:"date" bson:"date"`
-	FileAddress string `json:"fileAddress" bson:"fileAddress"`
-}
-
 func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
     //Check jwt key
     if !UserAuthorized(w, r, models.UserStatus(1)) {
@@ -60,7 +51,7 @@ func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
     }
     defer cursor.Close(ctx)
 
-    var allFiles []FileInfo
+    var allFiles []models.File
     for cursor.Next(ctx) {
         var user models.User
         if err := cursor.Decode(&user); err != nil {
@@ -69,21 +60,15 @@ func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
         }
 
         // Parse files for this user
-        for _, fileStr := range user.Files {
-            var fileInfo FileInfo
-            if err := json.Unmarshal([]byte(fileStr), &fileInfo); err != nil {
-                fmt.Printf("Error parsing file info: %v\n", err)
-                continue
-            }
-            
+        for _, file := range user.Files {
             // Only include files that match the requested institution (if given)
-            if fileInfo.Institution == request.Institution {
-                allFiles = append(allFiles, fileInfo)
+            if file.Institution == request.Institution {
+                allFiles = append(allFiles, file)
             }
 
             // Only include files that match the requested filename (if given)
-            if fileInfo.Filename == request.FileName {
-                allFiles = append(allFiles, fileInfo)
+            if file.Filename == request.FileName {
+                allFiles = append(allFiles, file)
             }
         }
     }
@@ -95,7 +80,7 @@ func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
 
     // Return all matching files in JSON format
     w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string][]FileInfo{
+    json.NewEncoder(w).Encode(map[string][]models.File{
         "files": allFiles,
     })
 }

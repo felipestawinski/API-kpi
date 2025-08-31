@@ -195,12 +195,9 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		// Find highest ID
 		maxID := 0
 		for _, file := range user.Files {
-			var fileInfo FileInfo
-			if err := json.Unmarshal([]byte(file), &fileInfo); err != nil {
-				continue
-			}
-			if fileInfo.ID > maxID {
-				maxID = fileInfo.ID
+			
+			if file.ID > maxID {
+				maxID = file.ID
 			}
 		}
 		newID = maxID + 1
@@ -218,12 +215,6 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("Inserting new file: %+v\n", newFile)
 
-	// Convert to JSON string
-	newFileJSON, err := json.Marshal(newFile)
-	if err != nil {
-		http.Error(w, "Error creating file entry", http.StatusInternalServerError)
-		return
-	}
 
 	// Update user document
 	_, err = collection.UpdateOne(
@@ -231,7 +222,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		bson.M{"username": username},
 		bson.M{
 			"$push": bson.M{
-				"files": string(newFileJSON),
+				"files": newFile,
 			},
 		},
 	)
