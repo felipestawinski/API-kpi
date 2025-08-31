@@ -57,3 +57,12 @@ type Session struct {
 	Username string
 	Expiry   time.Time
 }
+
+type File struct {
+    ID          int    `json:"id" bson:"id"`
+    Filename    string `json:"filename" bson:"filename"`
+    Institution string `json:"institution" bson:"institution"`
+    Writer      string `json:"writer" bson:"writer"`
+    Date        string `json:"date" bson:"date"`
+    FileAddress string `json:"fileAddress" bson:"fileAddress"`
+}

@@ -1,14 +1,13 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
-	"github.com/golang-jwt/jwt/v4"
 	"time"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/models"
 	"context"
+	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -32,7 +31,22 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Parse the body to get the file ID
-	var request stru
+	var request struct {
+		FileID string `json:"file_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// Find the user by username
+    var user models.User
+    err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+    if err != nil {
+        http.Error(w, "User not found", http.StatusNotFound)
+        return
+    }
+
 
 
 }
