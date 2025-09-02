@@ -9,8 +9,8 @@ import (
 	"context"
 	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson"
-	"strconv"
-	"fmt"
+    "fmt"
+    "bytes"
 )
 
 func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
@@ -32,15 +32,19 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+    fmt.Print("Request body: ", r.Body)
+
 	// Parse the body to get the file ID
 	var request struct {
-		FileID string `json:"file_id"`
+		FileID int `json:"fileId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
         fmt.Println("Error decoding request body:", err)
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
+
+    fmt.Println("Request received for file ID:", request.FileID)
 
 	var user models.User
     err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
@@ -53,14 +57,8 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
     var targetFile models.File
     var fileFound bool
 
-    fileID, err := strconv.Atoi(request.FileID)
-    if err != nil {
-        http.Error(w, "Invalid file ID format", http.StatusBadRequest)
-        return
-    }
-
     for _, file := range user.Files {
-        if file.ID == fileID {
+        if file.ID == request.FileID {
             targetFile = file
             fileFound = true
             break
@@ -74,6 +72,23 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 
     fmt.Println("Generating analysis for file:", targetFile.Filename)
     fmt.Println("File address:", targetFile.FileAddress)
+
+    // Prepare the JSON payload
+    payload := map[string]interface{}{
+        "fileAddress": targetFile.FileAddress,
+    }
+    payloadBytes, err := json.Marshal(payload)
+    if err != nil {
+        http.Error(w, "Failed to encode analysis request payload", http.StatusInternalServerError)
+        return
+    }
+
+    analysisReq, err := http.NewRequest("POST", "http://localhost:9090/analysis-gen", bytes.NewBuffer(payloadBytes))
+    if err != nil {
+        http.Error(w, "Failed to create analysis request", http.StatusInternalServerError)
+        return
+    }
+    analysisReq.Header.Set("Content-Type", "application/json")
 
     // Return the file address
     w.Header().Set("Content-Type", "application/json")
