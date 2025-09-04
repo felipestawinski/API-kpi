@@ -43,7 +43,6 @@ func main() {
 	http.Handle("/files", enableCORS(http.HandlerFunc(handlers.GetFilesHandler)))
 	http.Handle("/search-file", enableCORS(http.HandlerFunc(handlers.SearchFilesHandler)))
 	http.Handle("/user-info", enableCORS(http.HandlerFunc(handlers.UserInfoHandler)))
-	http.Handle("/blockchain/{method}", enableCORS(http.HandlerFunc(handlers.BlockchainInteraction)))
 	http.Handle("/users", enableCORS(http.HandlerFunc(handlers.GetUsersHandler)))
 	http.Handle("/pending-users", enableCORS(http.HandlerFunc(handlers.GetPendingUsersHandler)))
 	http.Handle("/change-permission", enableCORS(http.HandlerFunc(handlers.ChangePermissionHandler)))
