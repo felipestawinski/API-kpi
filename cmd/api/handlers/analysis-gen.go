@@ -83,12 +83,29 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    analysisReq, err := http.NewRequest("POST", "http://localhost:9090/analysis-gen", bytes.NewBuffer(payloadBytes))
-    if err != nil {
-        http.Error(w, "Failed to create analysis request", http.StatusInternalServerError)
-        return
-    }
-    analysisReq.Header.Set("Content-Type", "application/json")
+	analysisReq, err := http.NewRequest("POST", "http://localhost:9090/analysis-gen", bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		http.Error(w, "Failed to create analysis request", http.StatusInternalServerError)
+		return
+	}
+	analysisReq.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	analysisResp, err := client.Do(analysisReq)
+	if err != nil {
+		http.Error(w, "Failed to send analysis request", http.StatusInternalServerError)
+		return
+	}
+	defer analysisResp.Body.Close()
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(analysisResp.Body).Decode(&result); err != nil {
+		http.Error(w, "Failed to decode analysis response", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("Analysis response:", result)
+    
 
     // Return the file address
     w.Header().Set("Content-Type", "application/json")
