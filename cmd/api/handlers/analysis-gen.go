@@ -11,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
     "fmt"
     "bytes"
+	"encoding/base64"
 )
 
 func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
@@ -105,14 +106,32 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("Analysis response:", result)
-    
 
-    // Return the file address
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]interface{}{
-        "fileAddress": targetFile.FileAddress,
-        "filename":    targetFile.Filename,
-        "id":          targetFile.ID,
-    })
+	fig, exists := result["fig"]
+	if exists {
+		// Type assertion to ensure it's a string
+		if figStr, ok := fig.(string); ok {
+			fmt.Printf("Figure data type: %T\n", fig)
+			fmt.Printf("Figure data length: %d characters\n", len(figStr))
+			fmt.Println("Figure data (truncated to 100 chars):", figStr[:100]) // Print first 100 characters
+			// You can now use figStr as the base64 image data
+			// Example: send it to frontend, save to file, etc.
+		} else {
+			fmt.Println("Fig value is not a string")
+		}
+	} else {
+		fmt.Println("Key 'fig' not found in analysis response")
+		// Handle case where no Position column was found
+		if message, exists := result["message"]; exists {
+			fmt.Printf("Message: %v\n", message)
+		}
+	}
+
+		// Return the file address
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"filename":    targetFile.Filename,
+			"id":          targetFile.ID,
+		})
 }
 
