@@ -11,7 +11,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
     "fmt"
     "bytes"
-	"encoding/base64"
 )
 
 func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
@@ -100,38 +99,45 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	defer analysisResp.Body.Close()
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(analysisResp.Body).Decode(&result); err != nil {
-		http.Error(w, "Failed to decode analysis response", http.StatusInternalServerError)
-		return
-	}
+    if err := json.NewDecoder(analysisResp.Body).Decode(&result); err != nil {
+        http.Error(w, "Failed to decode analysis response", http.StatusInternalServerError)
+        return
+    }
 
-	fmt.Println("Analysis response:", result)
+    fmt.Println("Analysis response:", result)
 
-	fig, exists := result["fig"]
-	if exists {
-		// Type assertion to ensure it's a string
-		if figStr, ok := fig.(string); ok {
-			fmt.Printf("Figure data type: %T\n", fig)
-			fmt.Printf("Figure data length: %d characters\n", len(figStr))
-			fmt.Println("Figure data (truncated to 100 chars):", figStr[:100]) // Print first 100 characters
-			// You can now use figStr as the base64 image data
-			// Example: send it to frontend, save to file, etc.
-		} else {
-			fmt.Println("Fig value is not a string")
-		}
-	} else {
-		fmt.Println("Key 'fig' not found in analysis response")
-		// Handle case where no Position column was found
-		if message, exists := result["message"]; exists {
-			fmt.Printf("Message: %v\n", message)
-		}
-	}
+    // Prepare response data
+    responseData := map[string]interface{}{
+        "filename": targetFile.Filename,
+        "id":       targetFile.ID,
+    }
 
-		// Return the file address
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"filename":    targetFile.Filename,
-			"id":          targetFile.ID,
-		})
+    // Check if figure data exists and add it to response
+    if fig, exists := result["fig"]; exists {
+        if figStr, ok := fig.(string); ok {
+            fmt.Printf("Figure data type: %T\n", fig)
+            fmt.Printf("Figure data length: %d characters\n", len(figStr))
+            
+            // Add the base64 image to the response
+            responseData["image"] = figStr
+            responseData["hasImage"] = true
+        } else {
+            fmt.Println("Fig value is not a string")
+            responseData["hasImage"] = false
+            responseData["error"] = "Invalid image data format"
+        }
+    } else {
+        fmt.Println("Key 'fig' not found in analysis response")
+        responseData["hasImage"] = false
+        
+        // Include any message from the analysis service
+        if message, exists := result["message"]; exists {
+            responseData["message"] = message
+        }
+    }
+
+    // Return the complete response
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(responseData)
 }
 
