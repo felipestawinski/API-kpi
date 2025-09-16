@@ -52,7 +52,7 @@ Arquitetura
 
 
 
-------- How to run --------
+------ How to run -------
 
 Install MongoDB -> https://www.mongodb.com/docs/manual/administration/install-community/
 Install GO -> https://go.dev/doc/install
