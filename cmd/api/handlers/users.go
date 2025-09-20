@@ -23,24 +23,12 @@ type UserResponse struct {
     Files       []string `json:"files,omitempty"`
 }
 
-// UserRequest represents the request body for the GetUsersHandler
-type UserRequest struct {
-    Username string `json:"username"`
-}
-
 func GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 
 
     // Check if the user is authorized
-    if !UserAuthorized(w, r, models.UserStatus(1)) {
+    if !UserAuthorized(w, r, models.UserStatus(0)) {
         return 
-    }
-
-    // Parse the request body
-    var request UserRequest
-    if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-        http.Error(w, "Error decoding request body", http.StatusBadRequest)
-        return
     }
 
     // Get the list of users from the database
@@ -49,20 +37,17 @@ func GetUsersHandler(w http.ResponseWriter, r *http.Request) {
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
 
-    // Define filter based on the username provided
-    var filter bson.M
-    if request.Username == "ADM" {
-        // If username is ADM, return only pending users (permission = 0)
-        filter = bson.M{"permission": 0}
-        fmt.Println("Filtering for pending users only")
-    } else {
-        // Otherwise, return all non-pending users (permission != 0)
-        filter = bson.M{"permission": bson.M{"$ne": 0}}
-        fmt.Println("Filtering for non-pending users")
-    }
+    // Get username from JWT token
+	tokenStr := r.Header.Get("Authorization")
+	username, err := getUsernameFromToken(tokenStr)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
 
-    // Find returns a cursor and an error
-    cursor, err := collection.Find(ctx, filter)
+    fmt.Println("Requesting user list for:", username)
+
+    cursor, err := collection.Find(ctx, bson.M{})
     if err != nil {
         http.Error(w, "Error retrieving users", http.StatusInternalServerError)
         return
@@ -79,18 +64,14 @@ func GetUsersHandler(w http.ResponseWriter, r *http.Request) {
     // Convert User to UserResponse with string permissions
     var userResponses []UserResponse
     for _, user := range users {
-        // Convert int permission to UserStatus type
-        permissionStatus := models.UserStatus(user.Permission)
         
         // Create response with string permission
         userResponse := UserResponse{
+            ID:          user.ID,
             Email:       user.Email,
-            Password:    user.Password,
             Username:    user.Username,
             Institution: user.Institution,
-            Role:        user.Role,
-            Permission:  permissionStatus.String(),
-            ID:          user.ID,
+
         }
         userResponses = append(userResponses, userResponse)
     }
