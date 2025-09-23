@@ -49,8 +49,9 @@ type User struct {
     AccessTime  string `json:"accesstime" bson:"accesstime"`
     ReqAmount   int    `json:"reqamount" bson:"reqamount"`
 	ID          string `json:"id,omitempty" bson:"_id,omitempty"`
-	Files   []File `json:"files,omitempty" bson:"files,omitempty"`
+	Files      []File `json:"files,omitempty" bson:"files,omitempty"`
 	ProfilePicture string `json:"profilePicture,omitempty" bson:"profilePicture,omitempty"`
+    AnalysisImages []string `json:"analysisImages,omitempty" bson:"analysisImages,omitempty"`
 }
 // Session represents a user session
 type Session struct {
