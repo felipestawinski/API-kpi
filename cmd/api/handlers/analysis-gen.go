@@ -32,11 +32,10 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-    fmt.Print("Request body: ", r.Body)
-
 	// Parse the body to get the file ID
 	var request struct {
 		FileID int `json:"fileId"`
+		Prompt string `json:"prompt"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
         fmt.Println("Error decoding request body:", err)
@@ -45,6 +44,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
     fmt.Println("Request received for file ID:", request.FileID)
+	fmt.Println("Prompt:", request.Prompt)
 
 	var user models.User
     err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
@@ -76,6 +76,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
     // Prepare the JSON payload
     payload := map[string]interface{}{
         "fileAddress": targetFile.FileAddress,
+		"prompt":      request.Prompt,
     }
     payloadBytes, err := json.Marshal(payload)
     if err != nil {

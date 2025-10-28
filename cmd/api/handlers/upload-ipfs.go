@@ -89,7 +89,7 @@ func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	//Check jwt key
-	if !UserAuthorized(w, r, models.UserStatus(4)) {
+	if !UserAuthorized(w, r, models.UserStatus(0)) {
 		return
 	}
 	
