@@ -109,12 +109,11 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 
     // Prepare response data
     responseData := map[string]interface{}{
-        "filename": targetFile.Filename,
         "id":       targetFile.ID,
     }
 
     // Check if figure data exists and add it to response
-    if fig, exists := result["fig"]; exists {
+    if fig, exists := result["chart_base64"]; exists {
         if figStr, ok := fig.(string); ok {
             fmt.Printf("Figure data type: %T\n", fig)
             fmt.Printf("Figure data length: %d characters\n", len(figStr))
@@ -128,7 +127,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
             responseData["error"] = "Invalid image data format"
         }
     } else {
-        fmt.Println("Key 'fig' not found in analysis response")
+        fmt.Println("Key 'chart_base64' not found in analysis response")
         responseData["hasImage"] = false
         
         // Include any message from the analysis service
@@ -136,6 +135,12 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
             responseData["message"] = message
         }
     }
+
+	if text_response, exists := result["text_response"]; exists {
+		if textStr, ok := text_response.(string); ok {
+			responseData["text_response"] = textStr
+		}
+	}
 
     // Return the complete response
     w.Header().Set("Content-Type", "application/json")

@@ -67,3 +67,9 @@ type File struct {
     Date        string `json:"date" bson:"date"`
     FileAddress string `json:"fileAddress" bson:"fileAddress"`
 }
+
+type AnalysisResponse struct {
+    TextResponse string `json:"text_response"`
+    ChartBase64 string `json:"chart_base64"`
+    DataSummary string `json:"data_summary"`
+}
