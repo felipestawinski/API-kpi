@@ -207,7 +207,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	newFile := FileInfo{
 		ID:       newID,
 		Filename: filename,
-		Institution: "UTFPR",
+		Institution: r.FormValue("institution"),
 		Writer: username,
 		Date: time.Now().Format("2006-01-02"),
 		FileAddress: uri,

@@ -1,82 +1,89 @@
 package handlers
 
 import (
-	"net/http"
-	"time"
-	"github.com/felipestawinski/API-kpi/pkg/database"
-	"github.com/felipestawinski/API-kpi/pkg/config"
-	"github.com/felipestawinski/API-kpi/models"
-	"context"
-	"encoding/json"
-	"go.mongodb.org/mongo-driver/bson"
+    "net/http"
+    "time"
+    "github.com/felipestawinski/API-kpi/pkg/database"
+    "github.com/felipestawinski/API-kpi/pkg/config"
+    "github.com/felipestawinski/API-kpi/models"
+    "context"
+    "encoding/json"
+    "go.mongodb.org/mongo-driver/bson"
     "fmt"
     "bytes"
 )
 
 func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
-	tokenStr := r.Header.Get("Authorization")
-	username, err := getUsernameFromToken(tokenStr)
+    tokenStr := r.Header.Get("Authorization")
+    username, err := getUsernameFromToken(tokenStr)
 
-	// Check if the user is authorized
+    // Check if the user is authorized
     if !UserAuthorized(w, r, models.UserStatus(0)) {
         return 
     }
 
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+    if err != nil {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
 
-	db := database.NewMongoDB(config.MongoURI)
-	collection := db.Database(database.DbName).Collection(database.CollectionName)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+    db := database.NewMongoDB(config.MongoURI)
+    collection := db.Database(database.DbName).Collection(database.CollectionName)
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
 
-	// Parse the body to get the file ID
-	var request struct {
-		FileID int `json:"fileId"`
-		Prompt string `json:"prompt"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+    // Parse the body to get the file IDs (now accepting multiple)
+    var request struct {
+        FileIDs []int  `json:"fileIds"`
+        Prompt  string `json:"prompt"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
         fmt.Println("Error decoding request body:", err)
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		return
-	}
+        http.Error(w, "Invalid request payload", http.StatusBadRequest)
+        return
+    }
 
-    fmt.Println("Request received for file ID:", request.FileID)
-	fmt.Println("Prompt:", request.Prompt)
+    // Validate that at least one file ID was provided
+    if len(request.FileIDs) == 0 {
+        http.Error(w, "At least one file ID is required", http.StatusBadRequest)
+        return
+    }
 
-	var user models.User
+    var user models.User
     err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
     if err != nil {
         http.Error(w, "User not found", http.StatusNotFound)
         return
     }
 
-    // Search for the file with the specified ID in the user's files
-    var targetFile models.File
-    var fileFound bool
-
-    for _, file := range user.Files {
-        if file.ID == request.FileID {
-            targetFile = file
-            fileFound = true
-            break
+    // Search for all files with the specified IDs and collect their addresses
+    fileAddresses := []string{}
+    foundFileIDs := []int{}
+    
+    for _, requestedID := range request.FileIDs {
+        for _, file := range user.Files {
+            if file.ID == requestedID {
+                fileAddresses = append(fileAddresses, file.FileAddress)
+                foundFileIDs = append(foundFileIDs, file.ID)
+                break
+            }
         }
     }
 
-    if !fileFound {
-        http.Error(w, "File not found", http.StatusNotFound)
+    // Check if all requested files were found
+    if len(foundFileIDs) != len(request.FileIDs) {
+        http.Error(w, fmt.Sprintf("Not all files found. Requested: %d, Found: %d", len(request.FileIDs), len(foundFileIDs)), http.StatusNotFound)
         return
     }
 
-    fmt.Println("Generating analysis for file:", targetFile.Filename)
-    fmt.Println("File address:", targetFile.FileAddress)
+    fmt.Println("Generating analysis for files with IDs:", foundFileIDs)
+    fmt.Println("File addresses:", fileAddresses)
 
-    // Prepare the JSON payload
+    fmt.Println("File addresses to be sent for analysis:", fileAddresses)
+    // Prepare the JSON payload with multiple file addresses
     payload := map[string]interface{}{
-        "fileAddress": targetFile.FileAddress,
-		"prompt":      request.Prompt,
+        "fileAddresses": fileAddresses,
+        "prompt":        request.Prompt,
     }
     payloadBytes, err := json.Marshal(payload)
     if err != nil {
@@ -84,22 +91,22 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-	analysisReq, err := http.NewRequest("POST", "http://localhost:9090/analysis-gen", bytes.NewBuffer(payloadBytes))
-	if err != nil {
-		http.Error(w, "Failed to create analysis request", http.StatusInternalServerError)
-		return
-	}
-	analysisReq.Header.Set("Content-Type", "application/json")
+    analysisReq, err := http.NewRequest("POST", "http://localhost:9090/analysis-gen", bytes.NewBuffer(payloadBytes))
+    if err != nil {
+        http.Error(w, "Failed to create analysis request", http.StatusInternalServerError)
+        return
+    }
+    analysisReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	analysisResp, err := client.Do(analysisReq)
-	if err != nil {
-		http.Error(w, "Failed to send analysis request", http.StatusInternalServerError)
-		return
-	}
-	defer analysisResp.Body.Close()
+    client := &http.Client{}
+    analysisResp, err := client.Do(analysisReq)
+    if err != nil {
+        http.Error(w, "Failed to send analysis request", http.StatusInternalServerError)
+        return
+    }
+    defer analysisResp.Body.Close()
 
-	var result map[string]interface{}
+    var result map[string]interface{}
     if err := json.NewDecoder(analysisResp.Body).Decode(&result); err != nil {
         http.Error(w, "Failed to decode analysis response", http.StatusInternalServerError)
         return
@@ -109,7 +116,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 
     // Prepare response data
     responseData := map[string]interface{}{
-        "id":       targetFile.ID,
+        "ids": foundFileIDs,
     }
 
     // Check if figure data exists and add it to response
@@ -136,14 +143,13 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
         }
     }
 
-	if text_response, exists := result["text_response"]; exists {
-		if textStr, ok := text_response.(string); ok {
-			responseData["text_response"] = textStr
-		}
-	}
+    if text_response, exists := result["text_response"]; exists {
+        if textStr, ok := text_response.(string); ok {
+            responseData["text_response"] = textStr
+        }
+    }
 
     // Return the complete response
     w.Header().Set("Content-Type", "application/json")
     json.NewEncoder(w).Encode(responseData)
 }
-
