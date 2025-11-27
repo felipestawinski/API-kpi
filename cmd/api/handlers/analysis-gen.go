@@ -112,7 +112,6 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fmt.Println("Analysis response:", result)
 
     // Prepare response data
     responseData := map[string]interface{}{
