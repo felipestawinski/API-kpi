@@ -87,12 +87,14 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
     }
     payloadBytes, err := json.Marshal(payload)
     if err != nil {
+        fmt.Println("Failed to encode analysis request payload:", err)
         http.Error(w, "Failed to encode analysis request payload", http.StatusInternalServerError)
         return
     }
 
-    analysisReq, err := http.NewRequest("POST", "http://localhost:9090/analysis-gen", bytes.NewBuffer(payloadBytes))
+    analysisReq, err := http.NewRequest("POST", "http://127.0.0.1:9090/analysis-gen", bytes.NewBuffer(payloadBytes))
     if err != nil {
+        fmt.Println("Failed to create analysis request:", err)
         http.Error(w, "Failed to create analysis request", http.StatusInternalServerError)
         return
     }
@@ -101,6 +103,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
     client := &http.Client{}
     analysisResp, err := client.Do(analysisReq)
     if err != nil {
+        fmt.Println("Failed to send analysis request:", err)
         http.Error(w, "Failed to send analysis request", http.StatusInternalServerError)
         return
     }
@@ -108,6 +111,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 
     var result map[string]interface{}
     if err := json.NewDecoder(analysisResp.Body).Decode(&result); err != nil {
+        fmt.Println("Failed to decode analysis response:", err)
         http.Error(w, "Failed to decode analysis response", http.StatusInternalServerError)
         return
     }
