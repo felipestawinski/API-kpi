@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"mime/multipart"
 	"os"
+	"strings"
 	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
@@ -85,6 +86,47 @@ func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 	return ipfsHash, nil
 }
 
+// sendToDataHealthCheck sends a file to the data health check service and returns the analysis
+func sendToDataHealthCheck(fileData []byte, filename string) (string, error) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return "", fmt.Errorf("failed to create form file for health check: %v", err)
+	}
+	if _, err := io.Copy(part, bytes.NewReader(fileData)); err != nil {
+		return "", fmt.Errorf("failed to copy file for health check: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		return "", fmt.Errorf("failed to close writer for health check: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", "http://127.0.0.1:9090/data-health-check", &body)
+	if err != nil {
+		return "", fmt.Errorf("failed to create health check request: %v", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to send file to health check service: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("health check service returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read health check response: %v", err)
+	}
+
+	return string(respBody), nil
+}
+
 // uploadFileHandler handles the HTTP request for file upload
 func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -138,7 +180,9 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, handler, err := r.FormFile("file")
+	// Read dataHealthCheck flag from form
+	dataHealthCheck := strings.EqualFold(r.FormValue("dataHealthCheck"), "true")
+	file, _, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Unable to read file from request", http.StatusBadRequest)
 		fmt.Printf("Unable to read file from request: %v\n", err)
@@ -146,32 +190,35 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Reset file position before uploading
-	// file.Seek(0, io.SeekStart)
 
-	// Create JSON file with file details
-	fileDetails := map[string]interface{}{
-		"name": handler.Filename,
-		"size": handler.Size,
-	}
-	fileDetailsBytes, err := json.Marshal(fileDetails)
+	// Buffer the file so it can be read multiple times (IPFS upload + health check)
+	fileData, err := io.ReadAll(file)
 	if err != nil {
-		http.Error(w, "Error creating file details JSON", http.StatusInternalServerError)
-		return
-	}
-	jsonFilePath := "json-files/" + handler.Filename + ".json"
-	err = os.WriteFile(jsonFilePath, fileDetailsBytes, 0644)
-	if err != nil {
-		http.Error(w, "Error saving file details JSON", http.StatusInternalServerError)
+		http.Error(w, "Error reading file data", http.StatusInternalServerError)
+		fmt.Printf("Error reading file data: %v\n", err)
 		return
 	}
 
-	// Upload the original file to IPFS
-	ipfsHash, err := uploadFileToPinata(file, filename)
+
+	// Upload the original file to IPFS (using buffered data)
+	ipfsHash, err := uploadFileToPinata(bytes.NewReader(fileData), filename)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error uploading file: %v", err), http.StatusInternalServerError)
 		fmt.Printf("Error uploading file to Pinata: %v\n", err)
 		return
+	}
+
+	// If dataHealthCheck is enabled, send the file for analysis
+	var healthCheckAnalysis string
+	if dataHealthCheck {
+		fmt.Println("Data health check enabled, sending file for analysis...")
+		analysis, err := sendToDataHealthCheck(fileData, filename)
+		if err != nil {
+			fmt.Printf("Warning: data health check failed: %v\n", err)
+			healthCheckAnalysis = fmt.Sprintf("Health check failed: %v", err)
+		} else {
+			healthCheckAnalysis = analysis
+		}
 	}
 
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
@@ -232,9 +279,13 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 
-	// Respond with the file ID
+	// Respond with the file ID and optional health check analysis
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"fileId": fmt.Sprintf("%d", newID), //convert to int
-	})
+	response := map[string]string{
+		"fileId": fmt.Sprintf("%d", newID),
+	}
+	if dataHealthCheck {
+		response["dataHealthCheck"] = healthCheckAnalysis
+	}
+	json.NewEncoder(w).Encode(response)
 }
