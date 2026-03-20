@@ -39,6 +39,8 @@ func main() {
 	http.Handle("/register", enableCORS(http.HandlerFunc(handlers.RegisterHandler)))
 	http.Handle("/login", enableCORS(http.HandlerFunc(handlers.LoginHandler)))
 	http.Handle("/upload", enableCORS(http.HandlerFunc(handlers.UploadFileHandler)))
+	http.Handle("/health-check", enableCORS(http.HandlerFunc(handlers.HealthCheckOnlyHandler)))
+	http.Handle("/upload-confirmed", enableCORS(http.HandlerFunc(handlers.UploadConfirmedHandler)))
 	http.Handle("/upload-picture", enableCORS(http.HandlerFunc(handlers.UploadPictureHandler)))
 	http.Handle("/files", enableCORS(http.HandlerFunc(handlers.GetFilesHandler)))
 	http.Handle("/search-file", enableCORS(http.HandlerFunc(handlers.SearchFilesHandler)))

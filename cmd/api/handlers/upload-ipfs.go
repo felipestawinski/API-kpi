@@ -289,3 +289,223 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(response)
 }
+
+// HealthCheckOnlyHandler runs the data health check WITHOUT uploading to IPFS.
+// The frontend calls this first so the user can review the report before deciding.
+func HealthCheckOnlyHandler(w http.ResponseWriter, r *http.Request) {
+	if !UserAuthorized(w, r, models.UserStatus(0)) {
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		http.Error(w, "Error parsing multipart form", http.StatusInternalServerError)
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Unable to read file from request", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	fileData, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, "Error reading file data", http.StatusInternalServerError)
+		return
+	}
+
+	filename := r.FormValue("filename")
+	if filename == "" {
+		filename = "file.csv"
+	}
+
+	analysis, err := sendToDataHealthCheck(fileData, filename)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Health check failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"dataHealthCheck": analysis,
+	})
+}
+
+// sendToDataHealthCheckClean sends a file to the Python /data-health-check-clean
+// endpoint and returns the cleaned CSV bytes.
+func sendToDataHealthCheckClean(fileData []byte, filename string) ([]byte, error) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create form file for clean: %v", err)
+	}
+	if _, err := io.Copy(part, bytes.NewReader(fileData)); err != nil {
+		return nil, fmt.Errorf("failed to copy file for clean: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close writer for clean: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", "http://127.0.0.1:9090/data-health-check-clean", &body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create clean request: %v", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send file to clean service: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("clean service returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	cleanedData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read cleaned file response: %v", err)
+	}
+
+	return cleanedData, nil
+}
+
+// UploadConfirmedHandler uploads the file to IPFS after the user has reviewed
+// the health check. Accepts a "mode" form field: "raw" or "cleaned".
+func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
+	if !UserAuthorized(w, r, models.UserStatus(0)) {
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	filename := r.FormValue("filename")
+	if filename == "" {
+		http.Error(w, "Filename is required", http.StatusBadRequest)
+		return
+	}
+
+	tokenStr := r.Header.Get("Authorization")
+	username, err := getUsernameFromToken(tokenStr)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	db := database.NewMongoDB(config.MongoURI)
+	collection := db.Database(database.DbName).Collection(database.CollectionName)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var user models.User
+	err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	err = r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		http.Error(w, "Error parsing multipart form", http.StatusInternalServerError)
+		return
+	}
+
+	mode := r.FormValue("mode") // "raw" or "cleaned"
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Unable to read file from request", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	fileData, err := io.ReadAll(file)
+	if err != nil {
+		http.Error(w, "Error reading file data", http.StatusInternalServerError)
+		return
+	}
+
+	// Determine which data to upload
+	var uploadData []byte
+	if mode == "cleaned" {
+		fmt.Println("User chose cleaned file, requesting cleaning from analysis-gen...")
+		cleanedData, err := sendToDataHealthCheckClean(fileData, filename)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error cleaning file: %v", err), http.StatusInternalServerError)
+			return
+		}
+		uploadData = cleanedData
+	} else {
+		// Default to raw
+		uploadData = fileData
+	}
+
+	// Upload to IPFS
+	ipfsHash, err := uploadFileToPinata(bytes.NewReader(uploadData), filename)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error uploading file: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
+
+	type FileInfo struct {
+		ID          int    `json:"id" bson:"id"`
+		Filename    string `json:"filename" bson:"filename"`
+		Institution string `json:"institution" bson:"institution"`
+		Writer      string `json:"writer" bson:"writer"`
+		Date        string `json:"date" bson:"date"`
+		FileAddress string `json:"fileAddress" bson:"fileAddress"`
+	}
+
+	newID := 1
+	if len(user.Files) > 0 {
+		maxID := 0
+		for _, file := range user.Files {
+			if file.ID > maxID {
+				maxID = file.ID
+			}
+		}
+		newID = maxID + 1
+	}
+
+	newFile := FileInfo{
+		ID:          newID,
+		Filename:    filename,
+		Institution: r.FormValue("institution"),
+		Writer:      username,
+		Date:        time.Now().Format("2006-01-02"),
+		FileAddress: uri,
+	}
+
+	_, err = collection.UpdateOne(
+		ctx,
+		bson.M{"username": username},
+		bson.M{
+			"$push": bson.M{
+				"files": newFile,
+			},
+		},
+	)
+	if err != nil {
+		http.Error(w, "Error updating user files", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"fileId": fmt.Sprintf("%d", newID),
+	})
+}
