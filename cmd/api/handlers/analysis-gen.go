@@ -34,8 +34,10 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 
     // Parse the body to get the file IDs (now accepting multiple)
     var request struct {
-        FileIDs []int  `json:"fileIds"`
-        Prompt  string `json:"prompt"`
+        FileIDs             []int  `json:"fileIds"`
+        Prompt              string `json:"prompt"`
+        GenerateChart       bool   `json:"generateChart"`
+        ChartRecommendation bool   `json:"chartRecommendation"`
     }
     if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
         fmt.Println("Error decoding request body:", err)
@@ -82,8 +84,10 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
     fmt.Println("File addresses to be sent for analysis:", fileAddresses)
     // Prepare the JSON payload with multiple file addresses
     payload := map[string]interface{}{
-        "fileAddresses": fileAddresses,
-        "prompt":        request.Prompt,
+        "fileAddresses":      fileAddresses,
+        "prompt":             request.Prompt,
+        "generateChart":      request.GenerateChart,
+        "chartRecommendation": request.ChartRecommendation,
     }
     payloadBytes, err := json.Marshal(payload)
     if err != nil {
@@ -122,29 +126,28 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
         "ids": foundFileIDs,
     }
 
-    // Check if figure data exists and add it to response
-    if fig, exists := result["chart_base64"]; exists {
-        if figStr, ok := fig.(string); ok {
-            fmt.Printf("Figure data type: %T\n", fig)
-            fmt.Printf("Figure data length: %d characters\n", len(figStr))
-            
-            // Add the base64 image to the response
-            responseData["image"] = figStr
-            responseData["hasImage"] = true
-        } else {
-            fmt.Println("Fig value is not a string")
-            responseData["hasImage"] = false
-            responseData["error"] = "Invalid image data format"
-        }
-    } else {
-        fmt.Println("Key 'chart_base64' not found in analysis response")
-        responseData["hasImage"] = false
-        
-        // Include any message from the analysis service
-        if message, exists := result["message"]; exists {
-            responseData["message"] = message
-        }
-    }
+    	// Check if figure data exists and is a non-null string
+	if fig, exists := result["chart_base64"]; exists && fig != nil {
+		if figStr, ok := fig.(string); ok && figStr != "" {
+			fmt.Printf("Figure data type: %T\n", fig)
+			fmt.Printf("Figure data length: %d characters\n", len(figStr))
+			
+			// Add the base64 image to the response
+			responseData["image"] = figStr
+			responseData["hasImage"] = true
+		} else {
+			fmt.Println("Fig value is not a valid non-empty string")
+			responseData["hasImage"] = false
+		}
+	} else {
+		fmt.Println("Key 'chart_base64' not found or is null in analysis response")
+		responseData["hasImage"] = false
+		
+		// Include any message from the analysis service
+		if message, exists := result["message"]; exists {
+			responseData["message"] = message
+		}
+	}
 
     if text_response, exists := result["text_response"]; exists {
         if textStr, ok := text_response.(string); ok {
