@@ -38,6 +38,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
         Prompt              string `json:"prompt"`
         GenerateChart       bool   `json:"generateChart"`
         ChartRecommendation bool   `json:"chartRecommendation"`
+        Model               string `json:"model"`
     }
     if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
         fmt.Println("Error decoding request body:", err)
@@ -88,6 +89,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
         "prompt":             request.Prompt,
         "generateChart":      request.GenerateChart,
         "chartRecommendation": request.ChartRecommendation,
+        "model":              request.Model,
     }
     payloadBytes, err := json.Marshal(payload)
     if err != nil {
