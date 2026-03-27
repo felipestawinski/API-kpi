@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/felipestawinski/API-kpi/cmd/api/handlers"
+	"github.com/felipestawinski/API-kpi/pkg/database"
 	"github.com/joho/godotenv"
 )
 
@@ -32,6 +33,9 @@ func main() {
 		log.Fatal(".env file couldn't be loaded")
 	}
 
+	// Ensure MongoDB indexes for chat collection
+	database.EnsureChatIndexes()
+
 	// Move print before ListenAndServe
 	fmt.Println("Server starting on port 8080")
 
@@ -49,6 +53,17 @@ func main() {
 	http.Handle("/pending-users", enableCORS(http.HandlerFunc(handlers.GetPendingUsersHandler)))
 	http.Handle("/change-permission", enableCORS(http.HandlerFunc(handlers.ChangePermissionHandler)))
 	http.Handle("/analysis-gen", enableCORS(http.HandlerFunc(handlers.AnalysisGenHandler)))
+
+	// Chat message persistence routes
+	http.Handle("/chat/save", enableCORS(http.HandlerFunc(handlers.SaveChatMessageHandler)))
+	http.Handle("/chat/load", enableCORS(http.HandlerFunc(handlers.LoadChatHistoryHandler)))
+	http.Handle("/chat/image", enableCORS(http.HandlerFunc(handlers.LoadChatImageHandler)))
+	http.Handle("/chat/clear", enableCORS(http.HandlerFunc(handlers.ClearChatHistoryHandler)))
+
+	// Gallery routes
+	http.Handle("/gallery/save", enableCORS(http.HandlerFunc(handlers.SaveToGalleryHandler)))
+	http.Handle("/gallery/load", enableCORS(http.HandlerFunc(handlers.LoadGalleryHandler)))
+	http.Handle("/gallery/delete", enableCORS(http.HandlerFunc(handlers.DeleteGalleryImageHandler)))
 
 	if err := http.ListenAndServe("0.0.0.0:8080", nil); err != nil {
 		log.Fatal("Server failed to start:", err)
