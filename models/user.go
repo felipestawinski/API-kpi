@@ -4,55 +4,57 @@ import "time"
 
 // UserStatus defines permission levels for users
 type UserStatus int
+
 const (
-    StatusPending          UserStatus = 0
-    StatusReaderTimeBased  UserStatus = 1
-    StatusReaderAmountBased UserStatus = 2
-    StatusReaderUnlimited  UserStatus = 3
-    StatusEditorTimeBased  UserStatus = 4
-    StatusEditorAmountBased UserStatus = 5
-    StatusEditorUnlimited  UserStatus = 6
-    StatusAdmin            UserStatus = 7
+	StatusPending           UserStatus = 0
+	StatusReaderTimeBased   UserStatus = 1
+	StatusReaderAmountBased UserStatus = 2
+	StatusReaderUnlimited   UserStatus = 3
+	StatusEditorTimeBased   UserStatus = 4
+	StatusEditorAmountBased UserStatus = 5
+	StatusEditorUnlimited   UserStatus = 6
+	StatusAdmin             UserStatus = 7
 )
 
 // String returns the string representation of a UserStatus
 func (s UserStatus) String() string {
-    switch s {
-    case StatusPending:
-        return "Pendente"
-    case StatusReaderTimeBased:
-        return "Leitor (Por Tempo)"
-    case StatusReaderAmountBased:
-        return "Leitor (Por Requisição)"
-    case StatusReaderUnlimited:
-        return "Leitor (Permanente)"
-    case StatusEditorTimeBased:
-        return "Editor (Por Tempo)"
-    case StatusEditorAmountBased:
-        return "Editor (Por Requisição)"
-    case StatusEditorUnlimited:
-        return "Editor (Permanente)"
-    case StatusAdmin:
-        return "Administrator"
-    default:
-        return "Unknown"
-    }
+	switch s {
+	case StatusPending:
+		return "Pendente"
+	case StatusReaderTimeBased:
+		return "Leitor (Por Tempo)"
+	case StatusReaderAmountBased:
+		return "Leitor (Por Requisição)"
+	case StatusReaderUnlimited:
+		return "Leitor (Permanente)"
+	case StatusEditorTimeBased:
+		return "Editor (Por Tempo)"
+	case StatusEditorAmountBased:
+		return "Editor (Por Requisição)"
+	case StatusEditorUnlimited:
+		return "Editor (Permanente)"
+	case StatusAdmin:
+		return "Administrator"
+	default:
+		return "Unknown"
+	}
 }
 
 type User struct {
-	Email       string `json:"email" bson:"email"`
-	Password    string `json:"password" bson:"password"`
-	Username    string `json:"username" bson:"username"`
-	Institution string `json:"institution" bson:"institution"`
-	Role        string `json:"role" bson:"role"`
-	Permission  int    `json:"permission" bson:"permission"`
-    AccessTime  string `json:"accesstime" bson:"accesstime"`
-    ReqAmount   int    `json:"reqamount" bson:"reqamount"`
-	ID          string `json:"id,omitempty" bson:"_id,omitempty"`
-	Files      []File `json:"files,omitempty" bson:"files,omitempty"`
-	ProfilePicture string `json:"profilePicture,omitempty" bson:"profilePicture,omitempty"`
-    AnalysisImages []string `json:"analysisImages,omitempty" bson:"analysisImages,omitempty"`
+	Email          string   `json:"email" bson:"email"`
+	Password       string   `json:"password" bson:"password"`
+	Username       string   `json:"username" bson:"username"`
+	Institution    string   `json:"institution" bson:"institution"`
+	Role           string   `json:"role" bson:"role"`
+	Permission     int      `json:"permission" bson:"permission"`
+	AccessTime     string   `json:"accesstime" bson:"accesstime"`
+	ReqAmount      int      `json:"reqamount" bson:"reqamount"`
+	ID             string   `json:"id,omitempty" bson:"_id,omitempty"`
+	Files          []File   `json:"files,omitempty" bson:"files,omitempty"`
+	ProfilePicture string   `json:"profilePicture,omitempty" bson:"profilePicture,omitempty"`
+	AnalysisImages []string `json:"analysisImages,omitempty" bson:"analysisImages,omitempty"`
 }
+
 // Session represents a user session
 type Session struct {
 	Username string
@@ -60,16 +62,17 @@ type Session struct {
 }
 
 type File struct {
-    ID          int    `json:"id" bson:"id"`
-    Filename    string `json:"filename" bson:"filename"`
-    Institution string `json:"institution" bson:"institution"`
-    Writer      string `json:"writer" bson:"writer"`
-    Date        string `json:"date" bson:"date"`
-    FileAddress string `json:"fileAddress" bson:"fileAddress"`
+	ID          int    `json:"id" bson:"id"`
+	Filename    string `json:"filename" bson:"filename"`
+	Institution string `json:"institution" bson:"institution"`
+	Writer      string `json:"writer" bson:"writer"`
+	Date        string `json:"date" bson:"date"`
+	FileAddress string `json:"fileAddress" bson:"fileAddress"`
+	FileType    string `json:"fileType,omitempty" bson:"fileType,omitempty"`
 }
 
 type AnalysisResponse struct {
-    TextResponse string `json:"text_response"`
-    ChartBase64 string `json:"chart_base64"`
-    DataSummary string `json:"data_summary"`
+	TextResponse string `json:"text_response"`
+	ChartBase64  string `json:"chart_base64"`
+	DataSummary  string `json:"data_summary"`
 }

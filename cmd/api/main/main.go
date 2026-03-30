@@ -53,6 +53,7 @@ func main() {
 	http.Handle("/pending-users", enableCORS(http.HandlerFunc(handlers.GetPendingUsersHandler)))
 	http.Handle("/change-permission", enableCORS(http.HandlerFunc(handlers.ChangePermissionHandler)))
 	http.Handle("/analysis-gen", enableCORS(http.HandlerFunc(handlers.AnalysisGenHandler)))
+	http.Handle("/file-preview", enableCORS(http.HandlerFunc(handlers.FilePreviewHandler)))
 
 	// Chat message persistence routes
 	http.Handle("/chat/save", enableCORS(http.HandlerFunc(handlers.SaveChatMessageHandler)))

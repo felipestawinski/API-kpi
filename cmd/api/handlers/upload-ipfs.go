@@ -2,28 +2,77 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"mime/multipart"
-	"os"
-	"strings"
+	"github.com/felipestawinski/API-kpi/models"
 	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
-	"context"
-	"github.com/felipestawinski/API-kpi/models"
-	"time" 
+	"io"
+	"mime"
+	"mime/multipart"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 )
+
+var allowedFileTypes = map[string]bool{
+	"csv":  true,
+	"xlsx": true,
+	"json": true,
+}
+
+func detectFileType(filename string, contentType string) string {
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
+	if allowedFileTypes[ext] {
+		return ext
+	}
+
+	if contentType == "" {
+		return ""
+	}
+
+	parsedType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		parsedType = strings.ToLower(contentType)
+	}
+
+	switch {
+	case strings.Contains(parsedType, "csv") || strings.Contains(parsedType, "text/plain"):
+		return "csv"
+	case strings.Contains(parsedType, "spreadsheet") || strings.Contains(parsedType, "excel"):
+		return "xlsx"
+	case strings.Contains(parsedType, "json"):
+		return "json"
+	default:
+		return ""
+	}
+}
+
+func ensureFilenameHasExtension(baseName string, sourceFilename string, fileType string) string {
+	if strings.TrimSpace(baseName) == "" {
+		baseName = sourceFilename
+	}
+
+	if filepath.Ext(baseName) != "" {
+		return baseName
+	}
+
+	if fileType == "" {
+		return baseName
+	}
+
+	return fmt.Sprintf("%s.%s", baseName, fileType)
+}
 
 // uploadFileToPinata uploads a file to Pinata and returns the IPFS hash
 func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 
-	
 	apiKey := os.Getenv("API_KEY")
 	apiSecret := os.Getenv("API_SECRET")
-
 
 	// Prepare the form data
 	var body bytes.Buffer
@@ -50,7 +99,6 @@ func uploadFileToPinata(file io.Reader, filename string) (string, error) {
 	fmt.Println("apiSecret->", apiSecret)
 	// Add headers
 
-	
 	req.Header.Set("pinata_api_key", apiKey)
 	req.Header.Set("pinata_secret_api_key", apiSecret)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
@@ -134,17 +182,17 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	if !UserAuthorized(w, r, models.UserStatus(0)) {
 		return
 	}
-	
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 	filename := r.FormValue("filename")
 	fmt.Println("filename: ", filename)
-    if filename == "" {
-        http.Error(w, "Filename is required", http.StatusBadRequest)
-        return
-    }
+	if filename == "" {
+		http.Error(w, "Filename is required", http.StatusBadRequest)
+		return
+	}
 
 	tokenStr := r.Header.Get("Authorization")
 	username, err := getUsernameFromToken(tokenStr)
@@ -182,7 +230,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Read dataHealthCheck flag from form
 	dataHealthCheck := strings.EqualFold(r.FormValue("dataHealthCheck"), "true")
-	file, _, err := r.FormFile("file")
+	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Unable to read file from request", http.StatusBadRequest)
 		fmt.Printf("Unable to read file from request: %v\n", err)
@@ -190,6 +238,13 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	fileType := detectFileType(fileHeader.Filename, fileHeader.Header.Get("Content-Type"))
+	if fileType == "" {
+		http.Error(w, "Unsupported file type. Allowed types: csv, xlsx, json", http.StatusBadRequest)
+		return
+	}
+
+	filename = ensureFilenameHasExtension(filename, fileHeader.Filename, fileType)
 
 	// Buffer the file so it can be read multiple times (IPFS upload + health check)
 	fileData, err := io.ReadAll(file)
@@ -198,7 +253,6 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("Error reading file data: %v\n", err)
 		return
 	}
-
 
 	// Upload the original file to IPFS (using buffered data)
 	ipfsHash, err := uploadFileToPinata(bytes.NewReader(fileData), filename)
@@ -223,26 +277,14 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
 
-
-
 	// Create file info struct
-	type FileInfo struct {
-		ID       int    `json:"id" bson:"id"`
-		Filename string `json:"filename" bson:"filename"`
-		Institution string `json:"institution" bson:"institution"`
-		Writer string `json:"writer" bson:"writer"`
-		Date string `json:"date" bson:"date"`
-		FileAddress string `json:"fileAddress" bson:"fileAddress"`
-	}
-	
-
 	// Determine new ID
 	newID := 1
 	if len(user.Files) > 0 {
 		// Find highest ID
 		maxID := 0
 		for _, file := range user.Files {
-			
+
 			if file.ID > maxID {
 				maxID = file.ID
 			}
@@ -251,17 +293,17 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create new file entry
-	newFile := FileInfo{
-		ID:       newID,
-		Filename: filename,
+	newFile := models.File{
+		ID:          newID,
+		Filename:    filename,
 		Institution: r.FormValue("institution"),
-		Writer: username,
-		Date: time.Now().Format("2006-01-02"),
+		Writer:      username,
+		Date:        time.Now().Format("2006-01-02"),
 		FileAddress: uri,
+		FileType:    fileType,
 	}
 
 	fmt.Printf("Inserting new file: %+v\n", newFile)
-
 
 	// Update user document
 	_, err = collection.UpdateOne(
@@ -277,7 +319,6 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error updating user files", http.StatusInternalServerError)
 		return
 	}
-
 
 	// Respond with the file ID and optional health check analysis
 	w.Header().Set("Content-Type", "application/json")
@@ -308,12 +349,18 @@ func HealthCheckOnlyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, _, err := r.FormFile("file")
+	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Unable to read file from request", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
+
+	fileType := detectFileType(fileHeader.Filename, fileHeader.Header.Get("Content-Type"))
+	if fileType == "" {
+		http.Error(w, "Unsupported file type. Allowed types: csv, xlsx, json", http.StatusBadRequest)
+		return
+	}
 
 	fileData, err := io.ReadAll(file)
 	if err != nil {
@@ -323,7 +370,9 @@ func HealthCheckOnlyHandler(w http.ResponseWriter, r *http.Request) {
 
 	filename := r.FormValue("filename")
 	if filename == "" {
-		filename = "file.csv"
+		filename = ensureFilenameHasExtension("file", fileHeader.Filename, fileType)
+	} else {
+		filename = ensureFilenameHasExtension(filename, fileHeader.Filename, fileType)
 	}
 
 	analysis, err := sendToDataHealthCheck(fileData, filename)
@@ -424,12 +473,20 @@ func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mode := r.FormValue("mode") // "raw" or "cleaned"
-	file, _, err := r.FormFile("file")
+	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Unable to read file from request", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
+
+	fileType := detectFileType(fileHeader.Filename, fileHeader.Header.Get("Content-Type"))
+	if fileType == "" {
+		http.Error(w, "Unsupported file type. Allowed types: csv, xlsx, json", http.StatusBadRequest)
+		return
+	}
+
+	filename = ensureFilenameHasExtension(filename, fileHeader.Filename, fileType)
 
 	fileData, err := io.ReadAll(file)
 	if err != nil {
@@ -461,15 +518,6 @@ func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
 
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
 
-	type FileInfo struct {
-		ID          int    `json:"id" bson:"id"`
-		Filename    string `json:"filename" bson:"filename"`
-		Institution string `json:"institution" bson:"institution"`
-		Writer      string `json:"writer" bson:"writer"`
-		Date        string `json:"date" bson:"date"`
-		FileAddress string `json:"fileAddress" bson:"fileAddress"`
-	}
-
 	newID := 1
 	if len(user.Files) > 0 {
 		maxID := 0
@@ -481,13 +529,14 @@ func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
 		newID = maxID + 1
 	}
 
-	newFile := FileInfo{
+	newFile := models.File{
 		ID:          newID,
 		Filename:    filename,
 		Institution: r.FormValue("institution"),
 		Writer:      username,
 		Date:        time.Now().Format("2006-01-02"),
 		FileAddress: uri,
+		FileType:    fileType,
 	}
 
 	_, err = collection.UpdateOne(
