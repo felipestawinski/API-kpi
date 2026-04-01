@@ -9,7 +9,9 @@ import (
 	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -52,6 +54,11 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	if len(request.FileIDs) == 0 {
 		http.Error(w, "At least one file ID is required", http.StatusBadRequest)
 		return
+	}
+
+	request.Model = strings.TrimSpace(request.Model)
+	if request.Model == "" {
+		request.Model = "gpt-5-mini"
 	}
 
 	var user models.User
@@ -113,7 +120,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	analysisReq.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 150 * time.Second}
 	analysisResp, err := client.Do(analysisReq)
 	if err != nil {
 		fmt.Println("Failed to send analysis request:", err)
@@ -121,6 +128,19 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer analysisResp.Body.Close()
+
+	if analysisResp.StatusCode < 200 || analysisResp.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(analysisResp.Body)
+		if len(bodyBytes) == 0 {
+			http.Error(w, "Analysis service returned an error", analysisResp.StatusCode)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(analysisResp.StatusCode)
+		_, _ = w.Write(bodyBytes)
+		return
+	}
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(analysisResp.Body).Decode(&result); err != nil {
