@@ -8,7 +8,6 @@ import (
 	"time"
 	"go.mongodb.org/mongo-driver/bson"
 	"github.com/felipestawinski/API-kpi/pkg/database"
-	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/models"
 	"golang.org/x/crypto/bcrypt"
 	"github.com/golang-jwt/jwt/v4"
@@ -16,7 +15,7 @@ import (
 
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	client := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -31,7 +30,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Login method")
 	fmt.Println("user", loginUser)
 
-	collection := client.Database(database.DbName).Collection(database.CollectionName)
+	collection := db.Database(database.DbName).Collection(database.CollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -74,6 +73,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		"role": user.Role,
 		"profileImageUrl": user.ProfilePicture,
 		"email": user.Email,
+		"tokenLimit": user.TokenLimit,
+		"tokensUsed": user.TokensUsed,
 	})
 
 	//fmt.Fprintln(w, "Login successful")

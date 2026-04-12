@@ -8,7 +8,6 @@ import (
 	"time" 
 	"go.mongodb.org/mongo-driver/bson"
 	"github.com/felipestawinski/API-kpi/models"
-	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"golang.org/x/crypto/bcrypt"
 	"regexp"
@@ -40,7 +39,7 @@ func enableCORS(next http.Handler) http.Handler {
 
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	println("request: ", r)
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -92,6 +91,10 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	// "Pending" permission level
 	user.Permission = 0
+
+	// Set initial premium token credit
+	user.TokenLimit = 1000000
+	user.TokensUsed = 0
 
 	// Insere novo usuário
 	_, err = collection.InsertOne(ctx, user)

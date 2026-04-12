@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/felipestawinski/API-kpi/models"
-	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -50,7 +49,7 @@ func SaveToGalleryHandler(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now(),
 	}
 
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.GalleryCollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -83,7 +82,7 @@ func LoadGalleryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.GalleryCollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -142,7 +141,7 @@ func DeleteGalleryImageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.GalleryCollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

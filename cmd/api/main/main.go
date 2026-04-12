@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/felipestawinski/API-kpi/cmd/api/handlers"
 	"github.com/felipestawinski/API-kpi/pkg/database"
@@ -27,16 +29,29 @@ func enableCORS(next http.Handler) http.Handler {
 }
 
 func main() {
-	// Add error handling for server startup
+	// Load environment variables
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal(".env file couldn't be loaded")
 	}
 
-	// Ensure MongoDB indexes for chat collection
+	// Initialize the shared MongoDB client once at startup.
+	mongoClient := database.NewMongoDB(database.MongoURI)
+	database.SetClient(mongoClient)
+	handlers.SetMongoClient(mongoClient)
+
+	// Gracefully disconnect the client when main returns.
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := mongoClient.Disconnect(ctx); err != nil {
+			log.Println("MongoDB disconnect error:", err)
+		}
+	}()
+
+	// Ensure indexes now that the shared client is ready.
 	database.EnsureChatIndexes()
 
-	// Move print before ListenAndServe
 	fmt.Println("Server starting on port 8080")
 
 	// Rotas
@@ -54,6 +69,7 @@ func main() {
 	http.Handle("/change-permission", enableCORS(http.HandlerFunc(handlers.ChangePermissionHandler)))
 	http.Handle("/analysis-gen", enableCORS(http.HandlerFunc(handlers.AnalysisGenHandler)))
 	http.Handle("/file-preview", enableCORS(http.HandlerFunc(handlers.FilePreviewHandler)))
+	http.Handle("/token-usage", enableCORS(http.HandlerFunc(handlers.TokenUsageHandler)))
 
 	// Chat message persistence routes
 	http.Handle("/chat/save", enableCORS(http.HandlerFunc(handlers.SaveChatMessageHandler)))

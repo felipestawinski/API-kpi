@@ -6,7 +6,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"time"
 	"github.com/felipestawinski/API-kpi/pkg/database"
-	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/models"
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
@@ -23,7 +22,7 @@ func UserAuthorized(w http.ResponseWriter, r *http.Request, permissionLevel mode
 		return false
 	}
 
-	client := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 
 	claims := &jwt.RegisteredClaims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
@@ -35,7 +34,7 @@ func UserAuthorized(w http.ResponseWriter, r *http.Request, permissionLevel mode
 		return false
 	}
 
-	collection := client.Database(database.DbName).Collection(database.CollectionName)
+	collection := db.Database(database.DbName).Collection(database.CollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

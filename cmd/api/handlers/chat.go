@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/felipestawinski/API-kpi/models"
-	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -62,7 +61,7 @@ func SaveChatMessageHandler(w http.ResponseWriter, r *http.Request) {
 		Timestamp: ts,
 	}
 
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.ChatCollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -108,7 +107,7 @@ func LoadChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.ChatCollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -174,7 +173,7 @@ func LoadChatImageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.ChatCollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -229,7 +228,7 @@ func ClearChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.ChatCollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

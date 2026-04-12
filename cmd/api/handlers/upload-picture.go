@@ -11,7 +11,6 @@ import (
 	"os"
 	"time"
 	"github.com/felipestawinski/API-kpi/models"
-	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"github.com/golang-jwt/jwt/v4"
 	"go.mongodb.org/mongo-driver/bson"
@@ -158,7 +157,7 @@ func UploadPictureHandler(w http.ResponseWriter, r *http.Request) {
 	pictureURI := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
 
 	// Update user's profile picture in database
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.CollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

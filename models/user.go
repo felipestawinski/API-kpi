@@ -53,6 +53,8 @@ type User struct {
 	Files          []File   `json:"files,omitempty" bson:"files,omitempty"`
 	ProfilePicture string   `json:"profilePicture,omitempty" bson:"profilePicture,omitempty"`
 	AnalysisImages []string `json:"analysisImages,omitempty" bson:"analysisImages,omitempty"`
+	TokenLimit     int      `json:"tokenLimit" bson:"tokenLimit"`
+	TokensUsed     int      `json:"tokensUsed" bson:"tokensUsed"`
 }
 
 // Session represents a user session

@@ -5,7 +5,6 @@ import (
     "encoding/json"
     "net/http"
     "github.com/felipestawinski/API-kpi/models"
-    "github.com/felipestawinski/API-kpi/pkg/config"
     "github.com/felipestawinski/API-kpi/pkg/database"
     "go.mongodb.org/mongo-driver/bson"
     "time"
@@ -75,7 +74,7 @@ func ChangePermissionHandler(w http.ResponseWriter, r *http.Request) {
     }
 
     // Get the database connection
-    db := database.NewMongoDB(config.MongoURI)
+    db := mongoClient
     collection := db.Database(database.DbName).Collection(database.CollectionName)
     ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()

@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/felipestawinski/API-kpi/models"
-	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"io"
 	"net/http"
 	"strings"
@@ -29,10 +29,12 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := database.NewMongoDB(config.MongoURI)
+	// Do not create a rigid short-lived context here since the Python analysis takes a long time.
+	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.CollectionName)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	
+	initCtx, initCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer initCancel()
 
 	// Parse the body to get the file IDs (now accepting multiple)
 	var request struct {
@@ -62,7 +64,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user models.User
-	err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	err = collection.FindOne(initCtx, bson.M{"username": username}).Decode(&user)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
@@ -142,6 +144,23 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ── Streaming text path ──────────────────────────────────────────────────
+	// When the Python service streams plain text (text-only analysis), forward
+	// the body directly to the client without JSON decoding or token tracking.
+	contentType := analysisResp.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "text/plain") {
+		fmt.Println("Forwarding streaming text response from Python service")
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Transfer-Encoding", "chunked")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.WriteHeader(http.StatusOK)
+		if _, copyErr := io.Copy(w, analysisResp.Body); copyErr != nil {
+			fmt.Println("Error forwarding streaming body:", copyErr)
+		}
+		return
+	}
+
+	// ── JSON path (chart / chart recommendation) ──────────────────────────────
 	var result map[string]interface{}
 	if err := json.NewDecoder(analysisResp.Body).Decode(&result); err != nil {
 		fmt.Println("Failed to decode analysis response:", err)
@@ -182,6 +201,51 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 			responseData["text_response"] = textStr
 		}
 	}
+
+	// Track token usage from the analysis service response
+	tokensConsumed := 0
+	if tu, exists := result["tokens_used"]; exists && tu != nil {
+		switch v := tu.(type) {
+		case float64:
+			tokensConsumed = int(v)
+		case int:
+			tokensConsumed = v
+		}
+	}
+
+	fmt.Printf("DEBUG_TOKENS: Extracted %d tokens from Python response\n", tokensConsumed)
+
+	var tokenUserResult models.User
+	if tokensConsumed > 0 {
+		// Atomically increment tokensUsed and return the updated document in one round-trip.
+		updateCtx, updateCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer updateCancel()
+
+		after := options.After
+		findOneAndUpdateErr := collection.FindOneAndUpdate(
+			updateCtx,
+			bson.M{"username": username},
+			bson.M{"$inc": bson.M{"tokensUsed": tokensConsumed}},
+			&options.FindOneAndUpdateOptions{ReturnDocument: &after},
+		).Decode(&tokenUserResult)
+		if findOneAndUpdateErr != nil {
+			fmt.Println("Warning: failed to update token usage:", findOneAndUpdateErr)
+			// Fall back to the user loaded at the start of the handler.
+			tokenUserResult = user
+		} else {
+			fmt.Printf("DEBUG_TOKENS: FindOneAndUpdate succeeded for user %s, tokensUsed now: %d\n", username, tokenUserResult.TokensUsed)
+		}
+	} else {
+		// No tokens consumed – reuse the user struct already in memory.
+		tokenUserResult = user
+	}
+
+	tokenLimit := tokenUserResult.TokenLimit
+	if tokenLimit == 0 {
+		tokenLimit = 1000000
+	}
+	responseData["tokensUsed"] = tokenUserResult.TokensUsed
+	responseData["tokenLimit"] = tokenLimit
 
 	// Return the complete response
 	w.Header().Set("Content-Type", "application/json")

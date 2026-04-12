@@ -18,6 +18,21 @@ const GalleryCollectionName = "gallery_images"
 
 var client *mongo.Client
 
+// SetClient stores the shared client for use by all packages.
+// Must be called once from main() before any requests are served.
+func SetClient(c *mongo.Client) {
+	client = c
+}
+
+// Client returns the shared *mongo.Client set by SetClient.
+// Panics if SetClient has not been called yet.
+func Client() *mongo.Client {
+	if client == nil {
+		panic("database: shared client is not initialized; call database.SetClient first")
+	}
+	return client
+}
+
 // NewMongoDB initializes a new MongoDB client.
 func NewMongoDB(uri string) *mongo.Client {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -32,12 +47,12 @@ func NewMongoDB(uri string) *mongo.Client {
 }
 
 // EnsureChatIndexes creates the compound index on chat_messages for fast lookups.
+// Requires SetClient to have been called first.
 func EnsureChatIndexes() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	db := NewMongoDB(MongoURI)
-	collection := db.Database(DbName).Collection(ChatCollectionName)
+	collection := Client().Database(DbName).Collection(ChatCollectionName)
 
 	indexModel := mongo.IndexModel{
 		Keys: bson.D{

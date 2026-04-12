@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/felipestawinski/API-kpi/models"
-	"github.com/felipestawinski/API-kpi/pkg/config"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"io"
@@ -202,7 +201,7 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -276,6 +275,9 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
+
+	// Pre-warm the Python DataFrame cache in the background (fire-and-forget)
+	fireAndForgetPreload(uri, fileType)
 
 	// Create file info struct
 	// Determine new ID
@@ -429,6 +431,41 @@ func sendToDataHealthCheckClean(fileData []byte, filename string) ([]byte, error
 	return cleanedData, nil
 }
 
+// fireAndForgetPreload asynchronously notifies the Python analysis service
+// to pre-parse and cache the uploaded file as a DataFrame.
+// Errors are logged but never surface to the caller.
+func fireAndForgetPreload(fileAddress string, fileType string) {
+	go func() {
+		payload, err := json.Marshal(map[string]string{
+			"fileAddress": fileAddress,
+			"fileType":    fileType,
+		})
+		if err != nil {
+			fmt.Printf("[preload] Failed to marshal payload: %v\n", err)
+			return
+		}
+
+		client := &http.Client{Timeout: 120 * time.Second}
+		resp, err := client.Post(
+			"http://127.0.0.1:9090/preload-file",
+			"application/json",
+			bytes.NewReader(payload),
+		)
+		if err != nil {
+			fmt.Printf("[preload] Request failed for %s: %v\n", fileAddress, err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			fmt.Printf("[preload] Non-OK response for %s: status=%d body=%s\n", fileAddress, resp.StatusCode, string(body))
+			return
+		}
+		fmt.Printf("[preload] Successfully preloaded: %s\n", fileAddress)
+	}()
+}
+
 // UploadConfirmedHandler uploads the file to IPFS after the user has reviewed
 // the health check. Accepts a "mode" form field: "raw" or "cleaned".
 func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
@@ -454,7 +491,7 @@ func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db := database.NewMongoDB(config.MongoURI)
+	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.CollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -517,6 +554,9 @@ func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
+
+	// Pre-warm the Python DataFrame cache in the background (fire-and-forget)
+	fireAndForgetPreload(uri, fileType)
 
 	newID := 1
 	if len(user.Files) > 0 {
