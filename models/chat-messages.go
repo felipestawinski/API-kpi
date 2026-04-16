@@ -15,5 +15,6 @@ type ChatMessage struct {
 	Content   string             `json:"content" bson:"content"`
 	Image     string             `json:"image,omitempty" bson:"image,omitempty"` // Base64 PNG, nullable
 	HasImage  bool               `json:"hasImage" bson:"hasImage"`
+	ChartCode string             `json:"chartCode,omitempty" bson:"chartCode,omitempty"` // Python code used to generate the chart
 	Timestamp time.Time          `json:"timestamp" bson:"timestamp"`
 }

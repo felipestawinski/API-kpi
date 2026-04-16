@@ -5,14 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/felipestawinski/API-kpi/models"
-	"github.com/felipestawinski/API-kpi/pkg/database"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/felipestawinski/API-kpi/models"
+	"github.com/felipestawinski/API-kpi/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +33,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	// Do not create a rigid short-lived context here since the Python analysis takes a long time.
 	db := mongoClient
 	collection := db.Database(database.DbName).Collection(database.CollectionName)
-	
+
 	initCtx, initCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer initCancel()
 
@@ -144,23 +145,33 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ── Streaming text path ──────────────────────────────────────────────────
-	// When the Python service streams plain text (text-only analysis), forward
-	// the body directly to the client without JSON decoding or token tracking.
+	// ── Streaming text path ─────────────────────────────────────────────────
+	// The Python service returns text/plain (StreamingResponse) for text-only
+	// analysis. Forward the stream directly to the client so the frontend can
+	// consume it via ReadableStream.
 	contentType := analysisResp.Header.Get("Content-Type")
 	if strings.HasPrefix(contentType, "text/plain") {
-		fmt.Println("Forwarding streaming text response from Python service")
 		w.Header().Set("Content-Type", "text/plain")
-		w.Header().Set("Transfer-Encoding", "chunked")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(http.StatusOK)
-		if _, copyErr := io.Copy(w, analysisResp.Body); copyErr != nil {
-			fmt.Println("Error forwarding streaming body:", copyErr)
+		if flusher, ok := w.(http.Flusher); ok {
+			buf := make([]byte, 1024)
+			for {
+				n, readErr := analysisResp.Body.Read(buf)
+				if n > 0 {
+					_, _ = w.Write(buf[:n])
+					flusher.Flush()
+				}
+				if readErr != nil {
+					break
+				}
+			}
+		} else {
+			_, _ = io.Copy(w, analysisResp.Body)
 		}
 		return
 	}
 
-	// ── JSON path (chart / chart recommendation) ──────────────────────────────
+	// ── JSON path (chart generation / chart recommendation) ─────────────────
 	var result map[string]interface{}
 	if err := json.NewDecoder(analysisResp.Body).Decode(&result); err != nil {
 		fmt.Println("Failed to decode analysis response:", err)
@@ -199,6 +210,12 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	if text_response, exists := result["text_response"]; exists {
 		if textStr, ok := text_response.(string); ok {
 			responseData["text_response"] = textStr
+		}
+	}
+
+	if chart_code, exists := result["chart_code"]; exists && chart_code != nil {
+		if codeStr, ok := chart_code.(string); ok && codeStr != "" {
+			responseData["chart_code"] = codeStr
 		}
 	}
 

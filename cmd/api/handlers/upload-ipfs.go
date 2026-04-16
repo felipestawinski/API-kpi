@@ -5,9 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/felipestawinski/API-kpi/models"
-	"github.com/felipestawinski/API-kpi/pkg/database"
-	"go.mongodb.org/mongo-driver/bson"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -16,6 +13,10 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/felipestawinski/API-kpi/models"
+	"github.com/felipestawinski/API-kpi/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 var allowedFileTypes = map[string]bool{
@@ -65,6 +66,34 @@ func ensureFilenameHasExtension(baseName string, sourceFilename string, fileType
 	}
 
 	return fmt.Sprintf("%s.%s", baseName, fileType)
+}
+
+// preloadFileForRAG sends a fire-and-forget request to the Python analysis
+// service so it downloads, parses, caches the DataFrame, and indexes the
+// rows into ChromaDB for RAG retrieval.  Runs in a goroutine so the upload
+// response is not delayed.
+func preloadFileForRAG(fileAddress string, fileType string) {
+	go func() {
+		payload, _ := json.Marshal(map[string]string{
+			"fileAddress": fileAddress,
+			"fileType":    fileType,
+		})
+		req, err := http.NewRequest("POST", "http://127.0.0.1:9090/preload-file", bytes.NewBuffer(payload))
+		if err != nil {
+			fmt.Printf("preloadFileForRAG: failed to create request: %v\n", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{Timeout: 60 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("preloadFileForRAG: request failed: %v\n", err)
+			return
+		}
+		defer resp.Body.Close()
+		fmt.Printf("preloadFileForRAG: completed for %s (status %d)\n", fileAddress, resp.StatusCode)
+	}()
 }
 
 // uploadFileToPinata uploads a file to Pinata and returns the IPFS hash
@@ -276,9 +305,6 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
 
-	// Pre-warm the Python DataFrame cache in the background (fire-and-forget)
-	fireAndForgetPreload(uri, fileType)
-
 	// Create file info struct
 	// Determine new ID
 	newID := 1
@@ -321,6 +347,9 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error updating user files", http.StatusInternalServerError)
 		return
 	}
+
+	// Fire-and-forget: preload the file for DataFrame cache + RAG indexing
+	preloadFileForRAG(uri, fileType)
 
 	// Respond with the file ID and optional health check analysis
 	w.Header().Set("Content-Type", "application/json")
@@ -431,41 +460,6 @@ func sendToDataHealthCheckClean(fileData []byte, filename string) ([]byte, error
 	return cleanedData, nil
 }
 
-// fireAndForgetPreload asynchronously notifies the Python analysis service
-// to pre-parse and cache the uploaded file as a DataFrame.
-// Errors are logged but never surface to the caller.
-func fireAndForgetPreload(fileAddress string, fileType string) {
-	go func() {
-		payload, err := json.Marshal(map[string]string{
-			"fileAddress": fileAddress,
-			"fileType":    fileType,
-		})
-		if err != nil {
-			fmt.Printf("[preload] Failed to marshal payload: %v\n", err)
-			return
-		}
-
-		client := &http.Client{Timeout: 120 * time.Second}
-		resp, err := client.Post(
-			"http://127.0.0.1:9090/preload-file",
-			"application/json",
-			bytes.NewReader(payload),
-		)
-		if err != nil {
-			fmt.Printf("[preload] Request failed for %s: %v\n", fileAddress, err)
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			fmt.Printf("[preload] Non-OK response for %s: status=%d body=%s\n", fileAddress, resp.StatusCode, string(body))
-			return
-		}
-		fmt.Printf("[preload] Successfully preloaded: %s\n", fileAddress)
-	}()
-}
-
 // UploadConfirmedHandler uploads the file to IPFS after the user has reviewed
 // the health check. Accepts a "mode" form field: "raw" or "cleaned".
 func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
@@ -555,9 +549,6 @@ func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
 
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
 
-	// Pre-warm the Python DataFrame cache in the background (fire-and-forget)
-	fireAndForgetPreload(uri, fileType)
-
 	newID := 1
 	if len(user.Files) > 0 {
 		maxID := 0
@@ -592,6 +583,9 @@ func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error updating user files", http.StatusInternalServerError)
 		return
 	}
+
+	// Fire-and-forget: preload the file for DataFrame cache + RAG indexing
+	preloadFileForRAG(uri, fileType)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{

@@ -33,6 +33,7 @@ func SaveChatMessageHandler(w http.ResponseWriter, r *http.Request) {
 		Type      string `json:"type"`
 		Content   string `json:"content"`
 		Image     string `json:"image,omitempty"`
+		ChartCode string `json:"chartCode,omitempty"`
 		Timestamp string `json:"timestamp"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
@@ -58,6 +59,7 @@ func SaveChatMessageHandler(w http.ResponseWriter, r *http.Request) {
 		Content:   request.Content,
 		Image:     request.Image,
 		HasImage:  request.Image != "",
+		ChartCode: request.ChartCode,
 		Timestamp: ts,
 	}
 
