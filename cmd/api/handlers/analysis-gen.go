@@ -61,7 +61,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 
 	request.Model = strings.TrimSpace(request.Model)
 	if request.Model == "" {
-		request.Model = "gpt-5-mini"
+		request.Model = "gpt-4o"
 	}
 
 	var user models.User
