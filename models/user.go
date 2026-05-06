@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 // UserStatus defines permission levels for users
 type UserStatus int
@@ -50,7 +54,6 @@ type User struct {
 	AccessTime     string   `json:"accesstime" bson:"accesstime"`
 	ReqAmount      int      `json:"reqamount" bson:"reqamount"`
 	ID             string   `json:"id,omitempty" bson:"_id,omitempty"`
-	Files          []File   `json:"files,omitempty" bson:"files,omitempty"`
 	ProfilePicture string   `json:"profilePicture,omitempty" bson:"profilePicture,omitempty"`
 	AnalysisImages []string `json:"analysisImages,omitempty" bson:"analysisImages,omitempty"`
 	TokenLimit     int      `json:"tokenLimit" bson:"tokenLimit"`
@@ -64,13 +67,16 @@ type Session struct {
 }
 
 type File struct {
-	ID          int    `json:"id" bson:"id"`
-	Filename    string `json:"filename" bson:"filename"`
-	Institution string `json:"institution" bson:"institution"`
-	Writer      string `json:"writer" bson:"writer"`
-	Date        string `json:"date" bson:"date"`
-	FileAddress string `json:"fileAddress" bson:"fileAddress"`
-	FileType    string `json:"fileType,omitempty" bson:"fileType,omitempty"`
+	ID             primitive.ObjectID `json:"id" bson:"_id,omitempty"`
+	Filename       string             `json:"filename" bson:"filename"`
+	Institution    string             `json:"institution" bson:"institution"`
+	Writer         string             `json:"writer" bson:"writer"`
+	Date           string             `json:"date" bson:"date"`
+	FileAddress    string             `json:"fileAddress" bson:"fileAddress"`
+	FileType       string             `json:"fileType,omitempty" bson:"fileType,omitempty"`
+	OwnerID        primitive.ObjectID `json:"ownerId" bson:"ownerId"`
+	PreviewHeaders []string           `json:"previewHeaders,omitempty" bson:"previewHeaders,omitempty"`
+	PreviewRows    [][]string         `json:"previewRows,omitempty" bson:"previewRows,omitempty"`
 }
 
 type AnalysisResponse struct {

@@ -42,43 +42,24 @@ func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Connect to the database
+	// Query the files collection directly with an indexed field
 	db := mongoClient
-	collection := db.Database(database.DbName).Collection(database.CollectionName)
+	filesCollection := db.Database(database.DbName).Collection(database.FilesCollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Find all users
-	cursor, err := collection.Find(ctx, bson.M{})
+	filter := bson.M{request.SearchType: request.SearchTerm}
+	cursor, err := filesCollection.Find(ctx, filter)
 	if err != nil {
-		http.Error(w, "Error finding users", http.StatusInternalServerError)
+		http.Error(w, "Error searching files", http.StatusInternalServerError)
 		return
 	}
 	defer cursor.Close(ctx)
 
 	var allFiles []models.File
-	for cursor.Next(ctx) {
-		var user models.User
-		if err := cursor.Decode(&user); err != nil {
-			fmt.Printf("Error decoding user: %v\n", err)
-			continue
-		}
-
-		// Parse files for this user based on searchType
-		for _, file := range user.Files {
-			var match bool
-			switch request.SearchType {
-			case "filename":
-				match = file.Filename == request.SearchTerm
-			case "institution":
-				match = file.Institution == request.SearchTerm
-			case "writer":
-				match = file.Writer == request.SearchTerm
-			}
-			if match {
-				allFiles = append(allFiles, file)
-			}
-		}
+	if err := cursor.All(ctx, &allFiles); err != nil {
+		http.Error(w, "Error decoding files", http.StatusInternalServerError)
+		return
 	}
 
 	if len(allFiles) == 0 {
@@ -87,7 +68,6 @@ func SearchFilesHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fmt.Println("Found files:", allFiles)
 	}
-
 
 	// Return all matching files in JSON format
 	w.Header().Set("Content-Type", "application/json")

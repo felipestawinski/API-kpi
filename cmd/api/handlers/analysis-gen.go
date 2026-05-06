@@ -13,6 +13,7 @@ import (
 	"github.com/felipestawinski/API-kpi/models"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -32,20 +33,20 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Do not create a rigid short-lived context here since the Python analysis takes a long time.
 	db := mongoClient
-	collection := db.Database(database.DbName).Collection(database.CollectionName)
+	usersCollection := db.Database(database.DbName).Collection(database.CollectionName)
 
 	initCtx, initCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer initCancel()
 
-	// Parse the body to get the file IDs (now accepting multiple)
+	// Parse the body to get the file IDs (now accepting string ObjectIDs)
 	var request struct {
-		FileIDs             []int  `json:"fileIds"`
-		Prompt              string `json:"prompt"`
-		GenerateChart       bool   `json:"generateChart"`
-		ChartRecommendation bool   `json:"chartRecommendation"`
-		ChatID              string `json:"chatId"`
-		ForceRefresh        bool   `json:"forceRefresh"`
-		Model               string `json:"model"`
+		FileIDs             []string `json:"fileIds"`
+		Prompt              string   `json:"prompt"`
+		GenerateChart       bool     `json:"generateChart"`
+		ChartRecommendation bool     `json:"chartRecommendation"`
+		ChatID              string   `json:"chatId"`
+		ForceRefresh        bool     `json:"forceRefresh"`
+		Model               string   `json:"model"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		fmt.Println("Error decoding request body:", err)
@@ -65,32 +66,62 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user models.User
-	err = collection.FindOne(initCtx, bson.M{"username": username}).Decode(&user)
+	err = usersCollection.FindOne(initCtx, bson.M{"username": username}).Decode(&user)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
-	// Search for all files with the specified IDs and collect their addresses
-	fileAddresses := []string{}
-	fileTypes := []string{}
-	foundFileIDs := []int{}
-
-	for _, requestedID := range request.FileIDs {
-		for _, file := range user.Files {
-			if file.ID == requestedID {
-				fileAddresses = append(fileAddresses, file.FileAddress)
-				fileTypes = append(fileTypes, file.FileType)
-				foundFileIDs = append(foundFileIDs, file.ID)
-				break
-			}
+	// Convert string IDs to ObjectIDs
+	var objectIDs []primitive.ObjectID
+	for _, idStr := range request.FileIDs {
+		objID, err := primitive.ObjectIDFromHex(idStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Invalid file ID: %s", idStr), http.StatusBadRequest)
+			return
 		}
+		objectIDs = append(objectIDs, objID)
+	}
+
+	// Resolve the user's ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(user.ID)
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusInternalServerError)
+		return
+	}
+
+	// Query the files collection for all requested files owned by this user
+	filesCollection := db.Database(database.DbName).Collection(database.FilesCollectionName)
+	cursor, err := filesCollection.Find(initCtx, bson.M{
+		"_id":     bson.M{"$in": objectIDs},
+		"ownerId": userObjID,
+	})
+	if err != nil {
+		http.Error(w, "Error finding files", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(initCtx)
+
+	var foundFiles []models.File
+	if err := cursor.All(initCtx, &foundFiles); err != nil {
+		http.Error(w, "Error decoding files", http.StatusInternalServerError)
+		return
 	}
 
 	// Check if all requested files were found
-	if len(foundFileIDs) != len(request.FileIDs) {
-		http.Error(w, fmt.Sprintf("Not all files found. Requested: %d, Found: %d", len(request.FileIDs), len(foundFileIDs)), http.StatusNotFound)
+	if len(foundFiles) != len(request.FileIDs) {
+		http.Error(w, fmt.Sprintf("Not all files found. Requested: %d, Found: %d", len(request.FileIDs), len(foundFiles)), http.StatusNotFound)
 		return
+	}
+
+	// Collect file addresses and types
+	fileAddresses := make([]string, len(foundFiles))
+	fileTypes := make([]string, len(foundFiles))
+	foundFileIDs := make([]string, len(foundFiles))
+	for i, file := range foundFiles {
+		fileAddresses[i] = file.FileAddress
+		fileTypes[i] = file.FileType
+		foundFileIDs[i] = file.ID.Hex()
 	}
 
 	fmt.Println("Generating analysis for files with IDs:", foundFileIDs)
@@ -239,7 +270,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 		defer updateCancel()
 
 		after := options.After
-		findOneAndUpdateErr := collection.FindOneAndUpdate(
+		findOneAndUpdateErr := usersCollection.FindOneAndUpdate(
 			updateCtx,
 			bson.M{"username": username},
 			bson.M{"$inc": bson.M{"tokensUsed": tokensConsumed}},

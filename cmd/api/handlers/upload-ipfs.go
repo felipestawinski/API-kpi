@@ -17,6 +17,7 @@ import (
 	"github.com/felipestawinski/API-kpi/models"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var allowedFileTypes = map[string]bool{
@@ -93,6 +94,80 @@ func preloadFileForRAG(fileAddress string, fileType string) {
 		}
 		defer resp.Body.Close()
 		fmt.Printf("preloadFileForRAG: completed for %s (status %d)\n", fileAddress, resp.StatusCode)
+	}()
+}
+
+// preloadFilePreview runs in a background goroutine: it calls the Python
+// /preview-gen endpoint (200×100) and patches the file document in the
+// files collection with the preview data.
+func preloadFilePreview(fileObjID primitive.ObjectID, fileAddress string, fileType string) {
+	go func() {
+		payload, err := json.Marshal(map[string]interface{}{
+			"fileAddress":  fileAddress,
+			"fileType":     fileType,
+			"maxRows":      200,
+			"maxCols":      100,
+			"forceRefresh": false,
+		})
+		if err != nil {
+			fmt.Printf("preloadFilePreview: marshal error: %v\n", err)
+			return
+		}
+
+		req, err := http.NewRequest("POST", "http://127.0.0.1:9090/preview-gen", bytes.NewBuffer(payload))
+		if err != nil {
+			fmt.Printf("preloadFilePreview: request create error: %v\n", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{Timeout: 120 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("preloadFilePreview: request failed: %v\n", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			bodyStr := string(body)
+			if len(bodyStr) > 200 {
+				bodyStr = bodyStr[:200] + "..."
+			}
+			fmt.Printf("preloadFilePreview: bad status %d, body: %s\n", resp.StatusCode, bodyStr)
+			return
+		}
+
+		var result struct {
+			Headers []string   `json:"headers"`
+			Rows    [][]string `json:"rows"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			fmt.Printf("preloadFilePreview: decode error: %v\n", err)
+			return
+		}
+
+		// Patch the file document in the files collection
+		db := mongoClient
+		filesCollection := db.Database(database.DbName).Collection(database.FilesCollectionName)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		filter := bson.M{"_id": fileObjID}
+		update := bson.M{
+			"$set": bson.M{
+				"previewHeaders": result.Headers,
+				"previewRows":    result.Rows,
+			},
+		}
+		_, updateErr := filesCollection.UpdateOne(ctx, filter, update)
+		if updateErr != nil {
+			fmt.Printf("preloadFilePreview: MongoDB update failed for file %s: %v\n", fileObjID.Hex(), updateErr)
+		} else {
+			fmt.Printf("preloadFilePreview: cached %d headers, %d rows for file %s (%s)\n",
+				len(result.Headers), len(result.Rows), fileObjID.Hex(), fileAddress)
+		}
 	}()
 }
 
@@ -236,12 +311,15 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	collection := db.Database(database.DbName).Collection(database.CollectionName)
+	// Look up user to get their ObjectID
+	usersCollection := db.Database(database.DbName).Collection(database.CollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	var user models.User
-	err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	var user struct {
+		ID primitive.ObjectID `bson:"_id"`
+	}
+	err = usersCollection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
@@ -305,56 +383,37 @@ func UploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
 
-	// Create file info struct
-	// Determine new ID
-	newID := 1
-	if len(user.Files) > 0 {
-		// Find highest ID
-		maxID := 0
-		for _, file := range user.Files {
-
-			if file.ID > maxID {
-				maxID = file.ID
-			}
-		}
-		newID = maxID + 1
-	}
-
-	// Create new file entry
+	// Create new file document and insert into files collection
 	newFile := models.File{
-		ID:          newID,
+		ID:          primitive.NewObjectID(),
 		Filename:    filename,
 		Institution: r.FormValue("institution"),
 		Writer:      username,
 		Date:        time.Now().Format("2006-01-02"),
 		FileAddress: uri,
 		FileType:    fileType,
+		OwnerID:     user.ID,
 	}
 
 	fmt.Printf("Inserting new file: %+v\n", newFile)
 
-	// Update user document
-	_, err = collection.UpdateOne(
-		ctx,
-		bson.M{"username": username},
-		bson.M{
-			"$push": bson.M{
-				"files": newFile,
-			},
-		},
-	)
+	filesCollection := db.Database(database.DbName).Collection(database.FilesCollectionName)
+	_, err = filesCollection.InsertOne(ctx, newFile)
 	if err != nil {
-		http.Error(w, "Error updating user files", http.StatusInternalServerError)
+		http.Error(w, "Error inserting file document", http.StatusInternalServerError)
 		return
 	}
 
 	// Fire-and-forget: preload the file for DataFrame cache + RAG indexing
 	preloadFileForRAG(uri, fileType)
 
+	// Fire-and-forget: pre-compute file preview (200×100) and save to MongoDB
+	preloadFilePreview(newFile.ID, uri, fileType)
+
 	// Respond with the file ID and optional health check analysis
 	w.Header().Set("Content-Type", "application/json")
 	response := map[string]string{
-		"fileId": fmt.Sprintf("%d", newID),
+		"fileId": newFile.ID.Hex(),
 	}
 	if dataHealthCheck {
 		response["dataHealthCheck"] = healthCheckAnalysis
@@ -486,12 +545,14 @@ func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	db := mongoClient
-	collection := db.Database(database.DbName).Collection(database.CollectionName)
+	usersCollection := db.Database(database.DbName).Collection(database.CollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	var user models.User
-	err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	var user struct {
+		ID primitive.ObjectID `bson:"_id"`
+	}
+	err = usersCollection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
@@ -549,46 +610,32 @@ func UploadConfirmedHandler(w http.ResponseWriter, r *http.Request) {
 
 	uri := "https://scarlet-implicit-lobster-990.mypinata.cloud/ipfs/" + ipfsHash
 
-	newID := 1
-	if len(user.Files) > 0 {
-		maxID := 0
-		for _, file := range user.Files {
-			if file.ID > maxID {
-				maxID = file.ID
-			}
-		}
-		newID = maxID + 1
-	}
-
 	newFile := models.File{
-		ID:          newID,
+		ID:          primitive.NewObjectID(),
 		Filename:    filename,
 		Institution: r.FormValue("institution"),
 		Writer:      username,
 		Date:        time.Now().Format("2006-01-02"),
 		FileAddress: uri,
 		FileType:    fileType,
+		OwnerID:     user.ID,
 	}
 
-	_, err = collection.UpdateOne(
-		ctx,
-		bson.M{"username": username},
-		bson.M{
-			"$push": bson.M{
-				"files": newFile,
-			},
-		},
-	)
+	filesCollection := db.Database(database.DbName).Collection(database.FilesCollectionName)
+	_, err = filesCollection.InsertOne(ctx, newFile)
 	if err != nil {
-		http.Error(w, "Error updating user files", http.StatusInternalServerError)
+		http.Error(w, "Error inserting file document", http.StatusInternalServerError)
 		return
 	}
 
 	// Fire-and-forget: preload the file for DataFrame cache + RAG indexing
 	preloadFileForRAG(uri, fileType)
 
+	// Fire-and-forget: pre-compute file preview (200×100) and save to MongoDB
+	preloadFilePreview(newFile.ID, uri, fileType)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"fileId": fmt.Sprintf("%d", newID),
+		"fileId": newFile.ID.Hex(),
 	})
 }

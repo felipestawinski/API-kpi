@@ -12,13 +12,14 @@ import (
 	"github.com/felipestawinski/API-kpi/models"
 	"github.com/felipestawinski/API-kpi/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type filePreviewRequest struct {
-	FileID       int  `json:"fileId"`
-	MaxRows      int  `json:"maxRows"`
-	MaxCols      int  `json:"maxCols"`
-	ForceRefresh bool `json:"forceRefresh"`
+	FileID       string `json:"fileId"`
+	MaxRows      int    `json:"maxRows"`
+	MaxCols      int    `json:"maxCols"`
+	ForceRefresh bool   `json:"forceRefresh"`
 }
 
 func FilePreviewHandler(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +40,7 @@ func FilePreviewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if request.FileID == 0 {
+	if request.FileID == "" {
 		http.Error(w, "fileId is required", http.StatusBadRequest)
 		return
 	}
@@ -51,27 +52,32 @@ func FilePreviewHandler(w http.ResponseWriter, r *http.Request) {
 		request.MaxCols = 12
 	}
 
+	fileObjID, err := primitive.ObjectIDFromHex(request.FileID)
+	if err != nil {
+		http.Error(w, "Invalid fileId format", http.StatusBadRequest)
+		return
+	}
+
 	db := mongoClient
-	collection := db.Database(database.DbName).Collection(database.CollectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var user models.User
-	err = collection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
+	// Resolve user ObjectID
+	usersCollection := db.Database(database.DbName).Collection(database.CollectionName)
+	var user struct {
+		ID primitive.ObjectID `bson:"_id"`
+	}
+	err = usersCollection.FindOne(ctx, bson.M{"username": username}).Decode(&user)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
-	var selectedFile *models.File
-	for index := range user.Files {
-		if user.Files[index].ID == request.FileID {
-			selectedFile = &user.Files[index]
-			break
-		}
-	}
-
-	if selectedFile == nil {
+	// Find the file directly in the files collection
+	filesCollection := db.Database(database.DbName).Collection(database.FilesCollectionName)
+	var selectedFile models.File
+	err = filesCollection.FindOne(ctx, bson.M{"_id": fileObjID, "ownerId": user.ID}).Decode(&selectedFile)
+	if err != nil {
 		http.Error(w, "File not found", http.StatusNotFound)
 		return
 	}

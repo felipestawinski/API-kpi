@@ -15,6 +15,7 @@ const DbName = "kpidb"
 const CollectionName = "users"
 const ChatCollectionName = "chat_messages"
 const GalleryCollectionName = "gallery_images"
+const FilesCollectionName = "files"
 
 var client *mongo.Client
 
@@ -68,5 +69,40 @@ func EnsureChatIndexes() {
 		fmt.Println("Warning: failed to create chat index:", err)
 	} else {
 		fmt.Println("Chat indexes ensured successfully")
+	}
+}
+
+// EnsureFileIndexes creates indexes on the files collection for fast lookups.
+// Requires SetClient to have been called first.
+func EnsureFileIndexes() {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	collection := Client().Database(DbName).Collection(FilesCollectionName)
+
+	indexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "filename", Value: 1}},
+			Options: options.Index().SetName("idx_filename"),
+		},
+		{
+			Keys:    bson.D{{Key: "writer", Value: 1}},
+			Options: options.Index().SetName("idx_writer"),
+		},
+		{
+			Keys:    bson.D{{Key: "institution", Value: 1}},
+			Options: options.Index().SetName("idx_institution"),
+		},
+		{
+			Keys:    bson.D{{Key: "ownerId", Value: 1}},
+			Options: options.Index().SetName("idx_ownerId"),
+		},
+	}
+
+	_, err := collection.Indexes().CreateMany(ctx, indexes)
+	if err != nil {
+		fmt.Println("Warning: failed to create file indexes:", err)
+	} else {
+		fmt.Println("File indexes ensured successfully")
 	}
 }

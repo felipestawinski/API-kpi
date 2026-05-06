@@ -19,7 +19,6 @@ type UserResponse struct {
     Role        string   `json:"role"`
     Permission  string   `json:"permission"`
     ID          string   `json:"id,omitempty"`
-    Files       []string `json:"files,omitempty"`
 }
 
 func GetUsersHandler(w http.ResponseWriter, r *http.Request) {
