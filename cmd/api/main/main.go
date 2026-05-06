@@ -51,6 +51,7 @@ func main() {
 
 	// Ensure indexes now that the shared client is ready.
 	database.EnsureChatIndexes()
+	database.EnsureFileIndexes()
 
 	fmt.Println("Server starting on port 8080")
 
@@ -69,6 +70,7 @@ func main() {
 	http.Handle("/change-permission", enableCORS(http.HandlerFunc(handlers.ChangePermissionHandler)))
 	http.Handle("/analysis-gen", enableCORS(http.HandlerFunc(handlers.AnalysisGenHandler)))
 	http.Handle("/file-preview", enableCORS(http.HandlerFunc(handlers.FilePreviewHandler)))
+	http.Handle("/file-preview-cached", enableCORS(http.HandlerFunc(handlers.FilePreviewCachedHandler)))
 	http.Handle("/token-usage", enableCORS(http.HandlerFunc(handlers.TokenUsageHandler)))
 
 	// Chat message persistence routes
