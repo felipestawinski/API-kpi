@@ -47,6 +47,10 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 		ChatID              string   `json:"chatId"`
 		ForceRefresh        bool     `json:"forceRefresh"`
 		Model               string   `json:"model"`
+		ChatHistory         []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"chatHistory"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		fmt.Println("Error decoding request body:", err)
@@ -138,6 +142,7 @@ func AnalysisGenHandler(w http.ResponseWriter, r *http.Request) {
 		"chatId":              request.ChatID,
 		"forceRefresh":        request.ForceRefresh,
 		"model":               request.Model,
+		"chatHistory":         request.ChatHistory,
 	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
